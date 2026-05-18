@@ -1,0 +1,336 @@
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+  type ReactNode,
+} from 'react';
+import type {
+  ArchivedSession,
+  Benchmark,
+  Hole,
+  Lie,
+  Par,
+  SectorAverages,
+  Session,
+  Shot,
+  ShotCategory,
+} from '../types';
+import { uid } from '../lib/format';
+import { strokesGained } from '../lib/strokesGained';
+import {
+  currentStore,
+  historyStore,
+  syncSession,
+  deleteAllRemote,
+} from '../lib/storage';
+
+const DEFAULT_PLAYER = 'pierrick';
+
+/** Assumed distance left after a chip/pitch/bunker shot, by where it stopped. */
+function assumedProximity(lie: Lie): number {
+  switch (lie) {
+    case 'green':
+      return 2;
+    case 'fairway':
+      return 6;
+    case 'rough':
+      return 8;
+    case 'sand':
+      return 9;
+    case 'holed':
+      return 0;
+    default:
+      return 6;
+  }
+}
+
+function newHole(number: number, par: Par): Hole {
+  return { id: uid(), number, par, shots: [], completed: false };
+}
+
+function newSession(benchmark: Benchmark): Session {
+  return {
+    id: uid(),
+    date: new Date().toISOString(),
+    player: DEFAULT_PLAYER,
+    benchmark,
+    holes: [newHole(1, 4)],
+    archived: false,
+  };
+}
+
+/** Lie + remaining distance the next shot will be played from. */
+export function holeState(hole: Hole, holeLength: number) {
+  if (hole.shots.length === 0) {
+    return { lie: 'tee' as Lie, remaining: holeLength, count: 0 };
+  }
+  const last = hole.shots[hole.shots.length - 1];
+  return {
+    lie: last.toLie,
+    remaining: last.remainingAfter,
+    count: hole.shots.length,
+  };
+}
+
+export interface AddShotInput {
+  category: ShotCategory;
+  toLie: Lie;
+  /** GPS-measured travel distance (drive / approach). */
+  measuredDistance?: number;
+  /** Distance to the hole before the shot (short game slider / putt). */
+  distanceBefore?: number;
+  /** Distance to the hole after the shot (putt only; 0 = holed). */
+  distanceAfter?: number;
+  penalty?: number;
+  holeLength: number;
+}
+
+type Action =
+  | { type: 'hydrate'; session: Session }
+  | { type: 'setBenchmark'; benchmark: Benchmark }
+  | { type: 'setPar'; par: Par }
+  | { type: 'addShot'; input: AddShotInput }
+  | { type: 'undoShot' }
+  | { type: 'completeHole' }
+  | { type: 'nextHole' }
+  | { type: 'newRound' };
+
+function currentHole(s: Session): Hole {
+  return s.holes[s.holes.length - 1];
+}
+
+function buildShot(hole: Hole, input: AddShotInput, benchmark: Benchmark): Shot {
+  const { lie: trackedLie, remaining } = holeState(hole, input.holeLength);
+  const number = hole.shots.length + 1;
+
+  // Resolve the lie the shot is played from.
+  let fromLie: Lie;
+  if (input.category === 'drive') fromLie = 'tee';
+  else if (input.category === 'putt') fromLie = 'green';
+  else if (input.category === 'bunker') fromLie = 'sand';
+  else if (number === 1) fromLie = 'fairway';
+  else fromLie = trackedLie;
+
+  let distance: number;
+  let distanceBefore: number;
+  let remainingAfter: number;
+
+  if (input.category === 'putt') {
+    distanceBefore = input.distanceBefore ?? remaining;
+    remainingAfter = input.toLie === 'holed' ? 0 : input.distanceAfter ?? 0;
+    distance = distanceBefore;
+  } else if (input.category === 'short' || input.category === 'bunker') {
+    distanceBefore = input.distanceBefore ?? remaining;
+    remainingAfter =
+      input.toLie === 'holed' ? 0 : assumedProximity(input.toLie);
+    distance = distanceBefore;
+  } else {
+    // drive / approach via GPS
+    distance = input.measuredDistance ?? 0;
+    distanceBefore = remaining;
+    remainingAfter =
+      input.toLie === 'holed' ? 0 : Math.max(0, remaining - distance);
+  }
+
+  const penalty = input.penalty ?? 0;
+  const sgValue = strokesGained({
+    benchmark,
+    fromLie,
+    distanceBefore,
+    toLie: input.toLie,
+    distanceAfter: remainingAfter,
+    penalty,
+    holeLength: input.holeLength,
+  });
+
+  return {
+    id: uid(),
+    number,
+    category: input.category,
+    fromLie,
+    toLie: input.toLie,
+    distance,
+    remainingAfter,
+    strokesGained: sgValue,
+    penalty,
+  };
+}
+
+function reducer(state: Session, action: Action): Session {
+  switch (action.type) {
+    case 'hydrate':
+      return action.session;
+    case 'setBenchmark':
+      return { ...state, benchmark: action.benchmark };
+    case 'setPar': {
+      const holes = state.holes.slice();
+      holes[holes.length - 1] = {
+        ...currentHole(state),
+        par: action.par,
+      };
+      return { ...state, holes };
+    }
+    case 'addShot': {
+      const hole = currentHole(state);
+      if (hole.completed) return state;
+      const shot = buildShot(hole, action.input, state.benchmark);
+      const holes = state.holes.slice();
+      holes[holes.length - 1] = { ...hole, shots: [...hole.shots, shot] };
+      return { ...state, holes };
+    }
+    case 'undoShot': {
+      const hole = currentHole(state);
+      if (hole.shots.length === 0) return state;
+      const holes = state.holes.slice();
+      holes[holes.length - 1] = {
+        ...hole,
+        shots: hole.shots.slice(0, -1),
+        completed: false,
+      };
+      return { ...state, holes };
+    }
+    case 'completeHole': {
+      const hole = currentHole(state);
+      if (hole.shots.length === 0) return state;
+      const holes = state.holes.slice();
+      holes[holes.length - 1] = { ...hole, completed: true };
+      return { ...state, holes };
+    }
+    case 'nextHole': {
+      const hole = currentHole(state);
+      const holes = state.holes.slice();
+      if (!hole.completed) holes[holes.length - 1] = { ...hole, completed: true };
+      holes.push(newHole(hole.number + 1, hole.par));
+      return { ...state, holes };
+    }
+    case 'newRound':
+      return newSession(state.benchmark);
+    default:
+      return state;
+  }
+}
+
+// ── Derived selectors ──────────────────────────────────────────────────────
+
+export function allShots(s: Session): Shot[] {
+  return s.holes.flatMap((h) => h.shots);
+}
+
+export function sectorOf(c: ShotCategory): keyof SectorAverages {
+  if (c === 'drive') return 'drive';
+  if (c === 'approach') return 'approach';
+  if (c === 'putt') return 'putt';
+  return 'short'; // short + bunker
+}
+
+export function sectorTotals(s: Session): SectorAverages {
+  const acc: SectorAverages = { drive: 0, approach: 0, short: 0, putt: 0 };
+  for (const shot of allShots(s)) acc[sectorOf(shot.category)] += shot.strokesGained;
+  return {
+    drive: +acc.drive.toFixed(2),
+    approach: +acc.approach.toFixed(2),
+    short: +acc.short.toFixed(2),
+    putt: +acc.putt.toFixed(2),
+  };
+}
+
+export function totalSg(s: Session): number {
+  return +allShots(s)
+    .reduce((sum, sh) => sum + sh.strokesGained, 0)
+    .toFixed(2);
+}
+
+export function holesPlayed(s: Session): number {
+  return s.holes.filter((h) => h.completed).length;
+}
+
+/** Performance handicap implied by this round (lower = better). */
+export function perfHc(s: Session): number {
+  const shots = allShots(s);
+  if (shots.length === 0) return s.benchmark.kind === 'pro' ? 0 : s.benchmark.hc;
+  const avg = totalSg(s) / shots.length;
+  const base = s.benchmark.kind === 'pro' ? 0 : s.benchmark.hc;
+  return Math.max(0, Math.min(54, Math.round(base - avg * 10)));
+}
+
+export function archive(s: Session): ArchivedSession {
+  return {
+    id: s.id,
+    date: s.date,
+    player: s.player,
+    benchmark: s.benchmark,
+    holesPlayed: Math.max(holesPlayed(s), s.holes.some((h) => h.shots.length) ? 1 : 0),
+    shotsPlayed: allShots(s).length,
+    totalStrokesGained: totalSg(s),
+    sectors: sectorTotals(s),
+    perfHc: perfHc(s),
+  };
+}
+
+// ── Context ────────────────────────────────────────────────────────────────
+
+interface SessionCtx {
+  session: Session;
+  history: ArchivedSession[];
+  dispatch: React.Dispatch<Action>;
+  startNewRound: () => void;
+  clearHistory: () => void;
+}
+
+const Ctx = createContext<SessionCtx | null>(null);
+
+export function SessionProvider({ children }: { children: ReactNode }) {
+  const [session, dispatch] = useReducer(
+    reducer,
+    null,
+    () => currentStore.load() ?? newSession({ kind: 'hc', hc: 4 }),
+  );
+  const [history, setHistory] = useReducer(
+    (_: ArchivedSession[], next: ArchivedSession[]) => next,
+    null,
+    () => historyStore.load(),
+  );
+
+  useEffect(() => {
+    currentStore.save(session);
+  }, [session]);
+
+  const value = useMemo<SessionCtx>(() => {
+    const persistArchive = (s: Session) => {
+      if (allShots(s).length === 0) return;
+      const archived = archive(s);
+      const next = [
+        archived,
+        ...historyStore.load().filter((h) => h.id !== archived.id),
+      ];
+      historyStore.save(next);
+      setHistory(next);
+      void syncSession(archived);
+    };
+
+    return {
+      session,
+      history,
+      dispatch,
+      startNewRound: () => {
+        persistArchive(session);
+        dispatch({ type: 'newRound' });
+      },
+      clearHistory: () => {
+        historyStore.clear();
+        setHistory([]);
+        void deleteAllRemote();
+      },
+    };
+  }, [session, history]);
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
+
+export function useSession(): SessionCtx {
+  const ctx = useContext(Ctx);
+  if (!ctx) throw new Error('useSession must be used within SessionProvider');
+  return ctx;
+}
