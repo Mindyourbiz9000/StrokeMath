@@ -2,7 +2,7 @@
 // Bar components always have what they need at runtime.
 import 'chart.js/auto';
 
-export const GREEN = '#25e5a0';
-export const GREEN_DIM = 'rgba(37,229,160,0.15)';
+export const GREEN = '#7c7aff';
+export const GREEN_DIM = 'rgba(124,122,255,0.16)';
 export const GRID = 'rgba(255,255,255,0.06)';
-export const TICK = '#7e8593';
+export const TICK = '#86868f';

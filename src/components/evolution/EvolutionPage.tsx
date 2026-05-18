@@ -48,7 +48,7 @@ export function EvolutionPage() {
     datasets: [
       {
         data: sectorAvg,
-        backgroundColor: ['#45dffb', GREEN, '#ffc24b', '#9b8cff'],
+        backgroundColor: ['#64d2ff', GREEN, '#bf5af2', '#2ee6d6'],
         borderRadius: 6,
       },
     ],
