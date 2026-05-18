@@ -130,4 +130,22 @@ export const en: Record<keyof typeof fr, string> = {
   install: 'Install',
   offlineReady: 'Offline ready',
   errNeedStart: 'Press START before STOP.',
+
+  gpsEnable: '📍 ENABLE GPS',
+  gpsEnableHint:
+    'Allow location to measure your shots. GPS stays on during the round.',
+  gpsAcquiring: 'Acquiring GPS signal…',
+  gpsAccuracy: 'Accuracy ±{m} m',
+  gpsAccGood: 'Strong signal',
+  gpsAccFair: 'Fair signal — hold on',
+  gpsAccPoor: 'Weak signal — wait or enter manually',
+  gpsDeniedHelp:
+    'GPS denied. Enable location in your browser settings, or enter the distance manually.',
+  startRecorded: '✓ Start recorded · ±{m} m',
+  capturing: 'Measuring…',
+  distUncertainty: '± {m} m',
+  remeasure: '↻ Re-measure',
+  manualEntry: '✎ Manual entry',
+  useGps: '📡 Use GPS',
+  shotSaved: 'Shot saved ✓',
 };

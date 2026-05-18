@@ -128,4 +128,22 @@ export const fr = {
   install: 'Installer',
   offlineReady: 'Prêt hors-ligne',
   errNeedStart: 'Appuyez sur START avant STOP.',
+
+  gpsEnable: '📍 ACTIVER LE GPS',
+  gpsEnableHint:
+    'Autorisez la localisation pour mesurer vos coups. Le GPS reste actif pendant la partie.',
+  gpsAcquiring: 'Acquisition du signal GPS…',
+  gpsAccuracy: 'Précision ±{m} m',
+  gpsAccGood: 'Signal précis',
+  gpsAccFair: 'Signal moyen — patientez',
+  gpsAccPoor: 'Signal faible — attendez ou ressaisissez',
+  gpsDeniedHelp:
+    'GPS refusé. Activez la localisation dans les réglages du navigateur, ou saisissez la distance à la main.',
+  startRecorded: '✓ Départ enregistré · ±{m} m',
+  capturing: 'Mesure en cours…',
+  distUncertainty: '± {m} m',
+  remeasure: '↻ Re-mesurer',
+  manualEntry: '✎ Saisie manuelle',
+  useGps: '📡 Utiliser le GPS',
+  shotSaved: 'Coup enregistré ✓',
 } as const;

@@ -3,30 +3,34 @@ import { useSession } from '../../state/session';
 import { useToast } from '../Toast';
 import { sessionToCsv, downloadCsv } from '../../lib/csv';
 import { shortDate } from '../../lib/format';
-import type { GeoStatus } from '../../lib/geo';
+import type { GpsController } from '../../lib/geo';
 
-export function TopBar({ gps }: { gps: GeoStatus }) {
+export function TopBar({ gps }: { gps: GpsController }) {
   const { t } = useI18n();
   const { session, startNewRound } = useSession();
   const toast = useToast();
 
-  const pillClass =
-    gps === 'ready' || gps === 'locating'
-      ? 'gps-pill live'
-      : gps === 'denied' || gps === 'unavailable'
-        ? 'gps-pill denied'
-        : 'gps-pill';
+  const acc = gps.accuracy;
+  const live = gps.status === 'ready';
+  const acquiring = gps.status === 'acquiring';
+  const denied = gps.status === 'denied' || gps.permission === 'denied';
 
-  const pillText =
-    gps === 'ready'
-      ? t('gpsReady')
-      : gps === 'locating'
-        ? t('gpsLocating')
-        : gps === 'denied'
-          ? t('gpsDenied')
-          : gps === 'unavailable'
-            ? t('gpsUnavailable')
-            : t('gpsPaused', { mode: t('modePutting') });
+  const pillClass = denied
+    ? 'gps-pill denied'
+    : live || acquiring
+      ? 'gps-pill live'
+      : 'gps-pill';
+
+  const pillText = denied
+    ? t('gpsDenied')
+    : acquiring
+      ? t('gpsAcquiring')
+      : live && acc != null
+        ? t('gpsAccuracy', { m: acc })
+        : t('gpsReady');
+
+  const accClass =
+    acc == null ? '' : acc <= 6 ? 'pos' : acc <= 12 ? 'gold' : 'neg';
 
   const exportCsv = () => {
     const csv = sessionToCsv(session);
@@ -40,19 +44,36 @@ export function TopBar({ gps }: { gps: GeoStatus }) {
     }
   };
 
+  const enableGps = () => {
+    gps.requestPermission().catch(() => toast(t('gpsDenied')));
+  };
+
   return (
-    <div className="topbar" style={{ marginTop: 12 }}>
-      <div className={pillClass}>
-        <span className="dot" />
-        {pillText}
+    <>
+      <div className="topbar" style={{ marginTop: 12 }}>
+        <div className={pillClass}>
+          <span className="dot" />
+          <span className={accClass}>{pillText}</span>
+        </div>
+        <button className="btn-sq" onClick={exportCsv}>
+          📄{'\n'}
+          {t('csv')}
+        </button>
+        <button className="btn-sq danger" onClick={onNewGame}>
+          {t('newGame')}
+        </button>
       </div>
-      <button className="btn-sq" onClick={exportCsv}>
-        📄{'\n'}
-        {t('csv')}
-      </button>
-      <button className="btn-sq danger" onClick={onNewGame}>
-        {t('newGame')}
-      </button>
-    </div>
+
+      {gps.permission !== 'granted' && gps.status !== 'ready' && (
+        <div className="card" style={{ borderColor: 'var(--gold)' }}>
+          <button className="btn gold" onClick={enableGps}>
+            {t('gpsEnable')}
+          </button>
+          <p className="hint">
+            {denied ? t('gpsDeniedHelp') : t('gpsEnableHint')}
+          </p>
+        </div>
+      )}
+    </>
   );
 }

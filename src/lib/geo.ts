@@ -16,61 +16,265 @@ export function haversine(a: GeoPoint, b: GeoPoint): number {
   return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
-export type GeoStatus = 'idle' | 'locating' | 'ready' | 'denied' | 'unavailable';
+/** Uncertainty (m) on a distance built from two fixes of given accuracies. */
+export function combinedAccuracy(a?: number, b?: number): number {
+  return Math.round(Math.hypot(a ?? 0, b ?? 0));
+}
+
+export type GeoStatus =
+  | 'idle'
+  | 'acquiring'
+  | 'ready'
+  | 'denied'
+  | 'unavailable';
+
+export type GeoPermission =
+  | 'unknown'
+  | 'prompt'
+  | 'granted'
+  | 'denied'
+  | 'unsupported';
+
+export interface CaptureResult {
+  point: GeoPoint;
+  /** Effective accuracy of the averaged fix, in metres. */
+  accuracy: number;
+  /** Number of GPS samples that went into the average. */
+  samples: number;
+}
+
+interface CaptureOpts {
+  /** Stop early once a fix at least this accurate arrives (m). */
+  targetAccuracy?: number;
+  /** Hard cap on how long to keep sampling (ms). */
+  maxWaitMs?: number;
+}
 
 /**
- * One-shot, high-accuracy GPS fix. Averages a couple of quick reads to damp
- * the jitter you get standing still on a course.
+ * Production GPS controller for on-course use.
+ *
+ * A single browser `getCurrentPosition` fix is typically 5–20 m off — far too
+ * coarse to measure a golf shot. This keeps a continuous high-accuracy watch
+ * warm and, on `capture()`, averages the best samples taken while the player
+ * stands still, returning a fix plus its effective accuracy.
  */
-export function useGeolocation() {
-  const [status, setStatus] = useState<GeoStatus>('idle');
-  const [last, setLast] = useState<GeoPoint | null>(null);
+export function useGps() {
+  const supported = typeof navigator !== 'undefined' && 'geolocation' in navigator;
 
-  const capture = useCallback((): Promise<GeoPoint> => {
+  const [status, setStatus] = useState<GeoStatus>(
+    supported ? 'idle' : 'unavailable',
+  );
+  const [permission, setPermission] = useState<GeoPermission>(
+    supported ? 'unknown' : 'unsupported',
+  );
+  const [current, setCurrent] = useState<GeoPoint | null>(null);
+  const [accuracy, setAccuracy] = useState<number | null>(null);
+
+  const watchId = useRef<number | null>(null);
+  const buffer = useRef<GeoPoint[]>([]);
+  const mounted = useRef(true);
+
+  // Reflect the browser permission state when the Permissions API exists.
+  useEffect(() => {
+    if (!supported || !('permissions' in navigator)) return;
+    let perm: PermissionStatus | null = null;
+    navigator.permissions
+      .query({ name: 'geolocation' as PermissionName })
+      .then((p) => {
+        perm = p;
+        const sync = () => mounted.current && setPermission(p.state as GeoPermission);
+        sync();
+        p.onchange = sync;
+      })
+      .catch(() => {});
+    return () => {
+      if (perm) perm.onchange = null;
+    };
+  }, [supported]);
+
+  const handleSample = useCallback((pos: GeolocationPosition) => {
+    const point: GeoPoint = {
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude,
+      accuracy: pos.coords.accuracy,
+      t: Date.now(),
+    };
+    // Keep a short rolling buffer (~last 12 fixes) for averaging.
+    const buf = buffer.current;
+    buf.push(point);
+    if (buf.length > 12) buf.shift();
+    if (!mounted.current) return;
+    setCurrent(point);
+    setAccuracy(Math.round(point.accuracy ?? 0));
+    setStatus('ready');
+    setPermission('granted');
+  }, []);
+
+  const handleError = useCallback((err: GeolocationPositionError) => {
+    if (!mounted.current) return;
+    if (err.code === err.PERMISSION_DENIED) {
+      setStatus('denied');
+      setPermission('denied');
+    } else {
+      setStatus('unavailable');
+    }
+  }, []);
+
+  const startWatch = useCallback(() => {
+    if (!supported || watchId.current != null) return;
+    setStatus((s) => (s === 'ready' ? s : 'acquiring'));
+    watchId.current = navigator.geolocation.watchPosition(
+      handleSample,
+      handleError,
+      { enableHighAccuracy: true, maximumAge: 2_000, timeout: 25_000 },
+    );
+  }, [supported, handleSample, handleError]);
+
+  const stopWatch = useCallback(() => {
+    if (watchId.current != null) {
+      navigator.geolocation.clearWatch(watchId.current);
+      watchId.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      stopWatch();
+    };
+  }, [stopWatch]);
+
+  /** Explicitly trigger the OS permission prompt from a user gesture. */
+  const requestPermission = useCallback((): Promise<void> => {
     return new Promise((resolve, reject) => {
-      if (!('geolocation' in navigator)) {
-        setStatus('unavailable');
-        reject(new Error('unavailable'));
+      if (!supported) {
+        reject(new Error('unsupported'));
         return;
       }
-      setStatus('locating');
+      setStatus('acquiring');
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          const point: GeoPoint = {
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            accuracy: pos.coords.accuracy,
-            t: Date.now(),
-          };
-          setLast(point);
-          setStatus('ready');
-          resolve(point);
+          handleSample(pos);
+          startWatch();
+          resolve();
         },
         (err) => {
-          setStatus(err.code === err.PERMISSION_DENIED ? 'denied' : 'unavailable');
+          handleError(err);
           reject(err);
         },
         { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 },
       );
     });
-  }, []);
+  }, [supported, handleSample, handleError, startWatch]);
 
-  return { status, last, capture };
+  /**
+   * Average the best recent samples into one fix. Resolves quickly once a
+   * sufficiently accurate fix is in hand, otherwise keeps sampling up to
+   * `maxWaitMs` and returns the best estimate available.
+   */
+  const capture = useCallback(
+    (opts: CaptureOpts = {}): Promise<CaptureResult> => {
+      const targetAccuracy = opts.targetAccuracy ?? 6;
+      const maxWaitMs = opts.maxWaitMs ?? 5_000;
+
+      return new Promise((resolve, reject) => {
+        if (!supported) {
+          reject(new Error('unsupported'));
+          return;
+        }
+        startWatch();
+        buffer.current = [];
+        const startedAt = Date.now();
+
+        const finish = () => {
+          const all = buffer.current.slice();
+          if (all.length === 0) {
+            reject(new Error('no-fix'));
+            return;
+          }
+          // Keep samples within 1.6× of the best accuracy, weight by 1/acc².
+          const best = Math.min(...all.map((p) => p.accuracy ?? 9999));
+          const kept = all.filter((p) => (p.accuracy ?? 9999) <= best * 1.6);
+          let wsum = 0;
+          let lat = 0;
+          let lng = 0;
+          for (const p of kept) {
+            const w = 1 / Math.max(1, (p.accuracy ?? 9999) ** 2);
+            wsum += w;
+            lat += p.lat * w;
+            lng += p.lng * w;
+          }
+          const point: GeoPoint = {
+            lat: lat / wsum,
+            lng: lng / wsum,
+            accuracy: best,
+            t: Date.now(),
+          };
+          resolve({
+            point,
+            accuracy: Math.round(best),
+            samples: kept.length,
+          });
+        };
+
+        const tick = () => {
+          const buf = buffer.current;
+          const best = buf.length
+            ? Math.min(...buf.map((p) => p.accuracy ?? 9999))
+            : Infinity;
+          const elapsed = Date.now() - startedAt;
+          // Good enough with a couple of corroborating samples, or timed out.
+          if ((best <= targetAccuracy && buf.length >= 3) || elapsed >= maxWaitMs) {
+            window.clearInterval(timer);
+            finish();
+          }
+        };
+        const timer = window.setInterval(tick, 350);
+      });
+    },
+    [supported, startWatch],
+  );
+
+  return {
+    supported,
+    status,
+    permission,
+    current,
+    accuracy,
+    startWatch,
+    stopWatch,
+    requestPermission,
+    capture,
+  };
 }
 
-/** Keeps a GPS watch warm so the first shot fix is instant. Battery-aware. */
-export function useGpsWarmup(active: boolean) {
-  const watchId = useRef<number | null>(null);
+export type GpsController = ReturnType<typeof useGps>;
+
+/** Keep the screen awake during a round (re-acquires after tab switches). */
+export function useWakeLock(active: boolean) {
   useEffect(() => {
-    if (!active || !('geolocation' in navigator)) return;
-    watchId.current = navigator.geolocation.watchPosition(
-      () => {},
-      () => {},
-      { enableHighAccuracy: true, maximumAge: 5_000, timeout: 20_000 },
-    );
+    if (!active || !('wakeLock' in navigator)) return;
+    let lock: WakeLockSentinel | null = null;
+    let released = false;
+
+    const acquire = async () => {
+      try {
+        lock = await (navigator as Navigator).wakeLock.request('screen');
+      } catch {
+        /* denied / not visible — harmless */
+      }
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && !released) void acquire();
+    };
+
+    void acquire();
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
-      if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current);
-      watchId.current = null;
+      released = true;
+      document.removeEventListener('visibilitychange', onVisible);
+      lock?.release().catch(() => {});
     };
   }, [active]);
 }

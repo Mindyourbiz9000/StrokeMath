@@ -1,4 +1,5 @@
-import { useGeolocation, useGpsWarmup } from '../../lib/geo';
+import { useEffect } from 'react';
+import { useGps, useWakeLock } from '../../lib/geo';
 import { TopBar } from './TopBar';
 import { SessionSummary } from './SessionSummary';
 import { BenchmarkSelector } from './BenchmarkSelector';
@@ -7,17 +8,22 @@ import { ShotEntry } from './ShotEntry';
 import { ShotHistory } from './ShotHistory';
 
 export function JeuPage({ onConsult }: { onConsult: () => void }) {
-  const geo = useGeolocation();
-  // Keep a GPS lock warm once the player has been located once.
-  useGpsWarmup(geo.status === 'ready' || geo.status === 'locating');
+  const gps = useGps();
+  // Keep the screen awake while playing so a round isn't interrupted.
+  useWakeLock(true);
+
+  // Warm the GPS watch as soon as permission is already granted.
+  useEffect(() => {
+    if (gps.permission === 'granted') gps.startWatch();
+  }, [gps.permission, gps.startWatch]);
 
   return (
     <>
-      <TopBar gps={geo.status} />
+      <TopBar gps={gps} />
       <SessionSummary onConsult={onConsult} />
       <BenchmarkSelector />
       <Readout />
-      <ShotEntry geo={geo} />
+      <ShotEntry gps={gps} />
       <ShotHistory />
     </>
   );

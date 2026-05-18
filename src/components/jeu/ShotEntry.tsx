@@ -2,11 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '../../i18n';
 import { useSession, holeState } from '../../state/session';
 import { useToast } from '../Toast';
-import { haversine, type useGeolocation } from '../../lib/geo';
+import { haversine, combinedAccuracy, type GpsController } from '../../lib/geo';
 import { defaultHoleLength } from '../../lib/strokesGained';
 import type { GeoPoint, Lie, Par, ShotCategory } from '../../types';
-
-type Geo = ReturnType<typeof useGeolocation>;
 
 const CATEGORIES: { id: ShotCategory; t: string; s: string }[] = [
   { id: 'drive', t: 'catDrive', s: 'catDriveSub' },
@@ -25,7 +23,7 @@ const LANDING: { lie: Lie; t: string; danger?: boolean }[] = [
   { lie: 'holed', t: 'lieHoled' },
 ];
 
-export function ShotEntry({ geo }: { geo: Geo }) {
+export function ShotEntry({ gps }: { gps: GpsController }) {
   const { t } = useI18n();
   const { session, dispatch } = useSession();
   const toast = useToast();
@@ -37,7 +35,11 @@ export function ShotEntry({ geo }: { geo: Geo }) {
 
   // GPS capture
   const [startPt, setStartPt] = useState<GeoPoint | null>(null);
+  const [startAcc, setStartAcc] = useState<number | null>(null);
   const [measured, setMeasured] = useState<number | null>(null);
+  const [measuredAcc, setMeasuredAcc] = useState<number | null>(null);
+  const [busy, setBusy] = useState<null | 'start' | 'stop'>(null);
+  const [manualMode, setManualMode] = useState(false);
   const [manual, setManual] = useState('');
 
   // Short game
@@ -49,17 +51,18 @@ export function ShotEntry({ geo }: { geo: Geo }) {
   const [aM, setAM] = useState('');
   const [aC, setAC] = useState('');
 
-  const holeLength = useMemo(
-    () => defaultHoleLength(hole.par),
-    [hole.par],
-  );
+  const holeLength = useMemo(() => defaultHoleLength(hole.par), [hole.par]);
 
-  // Reset transient state whenever the category or hole changes.
+  // Reset transient state whenever the category or hole/shot changes.
   useEffect(() => {
     setToLie(null);
     setStartPt(null);
+    setStartAcc(null);
     setMeasured(null);
+    setMeasuredAcc(null);
+    setBusy(null);
     setManual('');
+    setManualMode(false);
     setPenalty(0);
   }, [category, hole.id, hole.shots.length]);
 
@@ -67,11 +70,15 @@ export function ShotEntry({ geo }: { geo: Geo }) {
   const isShort = category === 'short' || category === 'bunker';
   const isPutt = category === 'putt';
 
-  const reset = () => {
+  const resetAll = () => {
     setToLie(null);
     setStartPt(null);
+    setStartAcc(null);
     setMeasured(null);
+    setMeasuredAcc(null);
+    setBusy(null);
     setManual('');
+    setManualMode(false);
     setPenalty(0);
     setBM('');
     setBC('');
@@ -80,12 +87,18 @@ export function ShotEntry({ geo }: { geo: Geo }) {
   };
 
   const onStart = async () => {
+    setBusy('start');
     try {
-      const p = await geo.capture();
-      setStartPt(p);
+      const r = await gps.capture();
+      setStartPt(r.point);
+      setStartAcc(r.accuracy);
       setMeasured(null);
+      setMeasuredAcc(null);
     } catch {
       toast(t('gpsDenied'));
+      setManualMode(true);
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -94,28 +107,32 @@ export function ShotEntry({ geo }: { geo: Geo }) {
       toast(t('errNeedStart'));
       return;
     }
+    setBusy('stop');
     try {
-      const p = await geo.capture();
-      setMeasured(+haversine(startPt, p).toFixed(2));
+      const r = await gps.capture();
+      setMeasured(+haversine(startPt, r.point).toFixed(2));
+      setMeasuredAcc(combinedAccuracy(startAcc ?? undefined, r.accuracy));
     } catch {
       toast(t('gpsDenied'));
+      setManualMode(true);
+    } finally {
+      setBusy(null);
     }
   };
 
   const commitGps = () => {
-    const dist = measured ?? (manual ? Number(manual) : null);
+    const dist = manualMode
+      ? manual
+        ? Number(manual)
+        : null
+      : measured;
     if (dist == null || !toLie) return;
     dispatch({
       type: 'addShot',
-      input: {
-        category,
-        toLie,
-        measuredDistance: dist,
-        penalty,
-        holeLength,
-      },
+      input: { category, toLie, measuredDistance: dist, penalty, holeLength },
     });
-    reset();
+    toast(t('shotSaved'));
+    resetAll();
   };
 
   const commitShort = () => {
@@ -130,7 +147,8 @@ export function ShotEntry({ geo }: { geo: Geo }) {
         holeLength,
       },
     });
-    reset();
+    toast(t('shotSaved'));
+    resetAll();
   };
 
   const commitPutt = () => {
@@ -150,10 +168,13 @@ export function ShotEntry({ geo }: { geo: Geo }) {
         holeLength,
       },
     });
-    reset();
+    toast(t('shotSaved'));
+    resetAll();
   };
 
   const { count } = holeState(hole, holeLength);
+  const canCommitGps =
+    !!toLie && (manualMode ? manual !== '' : measured != null);
 
   return (
     <>
@@ -196,7 +217,7 @@ export function ShotEntry({ geo }: { geo: Geo }) {
         </div>
       </div>
 
-      {/* Landing terrain (GPS shots) */}
+      {/* Landing terrain + GPS capture */}
       {isGps && (
         <div className="card">
           <div className="section-label">{t('landingTerrain')}</div>
@@ -214,33 +235,76 @@ export function ShotEntry({ geo }: { geo: Geo }) {
             ))}
           </div>
 
-          <div className="section-label" style={{ marginTop: 16 }}>
-            📡 {t('gpsCapture')}
+          <div
+            className="section-label"
+            style={{ marginTop: 16, justifyContent: 'space-between' }}
+          >
+            <span>📡 {t('gpsCapture')}</span>
+            <button
+              onClick={() => setManualMode((m) => !m)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--muted)',
+                fontSize: 11,
+              }}
+            >
+              {manualMode ? t('useGps') : t('manualEntry')}
+            </button>
           </div>
-          <button
-            className="btn green-fill"
-            onClick={onStart}
-            style={{ marginTop: 8 }}
-          >
-            ▶ {t('start')}
-            <span className="btn-sub">{t('startSub')}</span>
-          </button>
-          <button
-            className="btn red-outline"
-            onClick={onStop}
-            disabled={!startPt}
-            style={{ marginTop: 10 }}
-          >
-            ■ {t('stop')}
-            <span className="btn-sub">{t('stopSub')}</span>
-          </button>
 
-          {measured != null && (
-            <div className="bignum" style={{ marginTop: 14 }}>
-              {measured.toFixed(2)} M
-            </div>
+          {!manualMode && (
+            <>
+              <button
+                className="btn green-fill"
+                onClick={onStart}
+                disabled={busy != null}
+                style={{ marginTop: 8 }}
+              >
+                ▶ {busy === 'start' ? t('capturing') : t('start')}
+                <span className="btn-sub">
+                  {startPt
+                    ? t('startRecorded', { m: startAcc ?? '?' })
+                    : t('startSub')}
+                </span>
+              </button>
+              <button
+                className="btn red-outline"
+                onClick={onStop}
+                disabled={!startPt || busy != null}
+                style={{ marginTop: 10 }}
+              >
+                ■ {busy === 'stop' ? t('capturing') : t('stop')}
+                <span className="btn-sub">{t('stopSub')}</span>
+              </button>
+
+              {measured != null && (
+                <div style={{ marginTop: 14, textAlign: 'center' }}>
+                  <div className="bignum">{measured.toFixed(2)} M</div>
+                  {measuredAcc != null && (
+                    <div
+                      className={`muted ${
+                        measuredAcc <= 8 ? 'pos' : measuredAcc <= 16 ? 'gold' : 'neg'
+                      }`}
+                      style={{ fontSize: 12 }}
+                    >
+                      {t('distUncertainty', { m: measuredAcc })}
+                    </div>
+                  )}
+                  <button
+                    className="btn ghost"
+                    style={{ marginTop: 10 }}
+                    onClick={onStop}
+                    disabled={busy != null}
+                  >
+                    {t('remeasure')}
+                  </button>
+                </div>
+              )}
+            </>
           )}
-          {geo.status === 'denied' && (
+
+          {manualMode && (
             <label className="field" style={{ marginTop: 10, display: 'block' }}>
               <span className="muted" style={{ fontSize: 11 }}>
                 {t('meters')}
@@ -248,7 +312,9 @@ export function ShotEntry({ geo }: { geo: Geo }) {
               <input
                 inputMode="decimal"
                 value={manual}
-                onChange={(e) => setManual(e.target.value)}
+                onChange={(e) =>
+                  setManual(e.target.value.replace(/[^0-9.]/g, ''))
+                }
                 placeholder="0"
               />
             </label>
@@ -260,7 +326,7 @@ export function ShotEntry({ geo }: { geo: Geo }) {
           <button
             className="btn"
             style={{ marginTop: 10 }}
-            disabled={!toLie || (measured == null && !manual)}
+            disabled={!canCommitGps}
             onClick={commitGps}
           >
             {t('validateShot')}
@@ -390,9 +456,7 @@ function MeterCm({
         <input
           inputMode="numeric"
           value={c}
-          onChange={(e) =>
-            setC(e.target.value.replace(/\D/g, '').slice(0, 2))
-          }
+          onChange={(e) => setC(e.target.value.replace(/\D/g, '').slice(0, 2))}
           placeholder="00"
         />
       </div>
