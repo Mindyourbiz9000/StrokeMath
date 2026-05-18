@@ -1,16 +1,19 @@
-# StrokeMath — Strokes Gained Tracker
+# ShotIQ — Strokes Gained Tracker
 
 Mobile-first golf app to record **every shot of every hole by GPS**, compute
 its distance and landing lie, and score your **Strokes Gained** against a
 chosen handicap (or PRO/scratch) benchmark. Built as a polished rebuild of the
 original POC.
 
+- **Home** — generic marketing landing explaining the app, with guest-play
+  and (optional) Google sign-in.
 - **JEU** — GPS shot capture (START/STOP), shot categories (drive, approach,
   short game, greenside bunker, putting), landing-lie selection, penalties,
   per-hole shot history, live session summary, CSV export.
 - **ÉVOLUTION** — performance-handicap trend, average SG per sector, last-10
   sessions history, all persisted (offline-first, optional Supabase sync).
-- French / English toggle, installable PWA, works offline on the course.
+- Play as a guest with no account (local data); sign in with Google to sync
+  rounds to the cloud. French / English toggle, installable PWA, offline-ready.
 
 ## Tech stack
 
@@ -28,19 +31,25 @@ npm run preview  # serve the production build
 The app works **fully offline with no backend** — sessions are stored in
 `localStorage`. Supabase is an optional cloud mirror.
 
-## Supabase (optional cloud sync)
+## Supabase (optional cloud sync + Google login)
 
 1. Create a Supabase project.
-2. Run `supabase/schema.sql` in the SQL editor.
-3. Copy `.env.example` → `.env.local` and fill:
+2. Run `supabase/schema.sql` in the SQL editor (creates the per-user
+   `sessions` table with row-level security).
+3. Enable Google auth: **Authentication → Providers → Google**, add your
+   Google OAuth client ID + secret (Google Cloud Console → Credentials), then
+   under **Authentication → URL Configuration** add your Vercel domain and
+   `http://localhost:5173` to the redirect allow-list.
+4. Copy `.env.example` → `.env.local` and fill:
 
    ```
    VITE_SUPABASE_URL=https://xxxx.supabase.co
-   VITE_SUPABASE_ANON_KEY=eyJ...
+   VITE_SUPABASE_ANON_KEY=eyJ...        # Project Settings → API → anon public
    ```
 
-Finished sessions then upsert to the `sessions` table. Without these vars the
-app silently stays local-only.
+Guests use local storage only. Once a user signs in with Google their local
+history is pushed up and finished rounds upsert to `sessions` (each user sees
+only their own rows). Without these vars the app stays fully local-only.
 
 ## Deploy to Vercel
 
@@ -67,7 +76,7 @@ The codebase is a standard client-only web app, so wrapping it as a native
 iOS/Android app later is straightforward with **Capacitor**:
 
 ```bash
-npm i -D @capacitor/cli && npx cap init StrokeMath app.strokemath
+npm i -D @capacitor/cli && npx cap init ShotIQ app.shotiq
 npm i @capacitor/core @capacitor/ios @capacitor/android @capacitor/geolocation
 npx cap add ios && npx cap add android
 ```

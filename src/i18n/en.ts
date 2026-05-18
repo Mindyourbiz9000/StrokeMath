@@ -2,9 +2,9 @@ import type { fr } from './fr';
 
 export const en: Record<keyof typeof fr, string> = {
   appTitle: 'STROKES GAINED TRACKER',
-  brand: 'STROKEMATH',
-  tagline: 'STATS PRO · PERFORMANCE ANALYTICS',
-  player: '{name} · PRO Index',
+  brand: 'SHOTIQ',
+  tagline: 'EVERY SHOT. EVERY STAT.',
+  player: '{name}',
 
   tabPlay: 'PLAY',
   tabEvolution: 'PROGRESS',
@@ -120,11 +120,10 @@ export const en: Record<keyof typeof fr, string> = {
   roundLine: '{holes} hole · {shots} shots',
   noSessions: 'No completed session yet.',
 
-  ctaTitle: 'TURN YOUR DATA INTO A PROGRESS PLAN',
-  ctaBody:
-    'Your Strokes Gained charts reveal exactly where you lose shots. A personalised 30-min review to target the practice that truly matters.',
-  ctaButton: '📅 BOOK MY FREE REVIEW',
-  ctaTagline: '🎯 ANALYSE MY RESULTS',
+  insightsTitle: 'YOUR DATA, YOUR PROGRESS',
+  insightsBody:
+    'Your Strokes Gained charts show exactly where you gain and lose shots. Focus practice on your weakest sector.',
+  insightsTag: '🎯 PERFORMANCE ANALYSIS',
 
   langLabel: 'EN',
   install: 'Install',
@@ -148,4 +147,42 @@ export const en: Record<keyof typeof fr, string> = {
   manualEntry: '✎ Manual entry',
   useGps: '📡 Use GPS',
   shotSaved: 'Shot saved ✓',
+
+  homeHeroTitle: 'Golf, measured shot by shot.',
+  homeHeroSub:
+    'ShotIQ records every shot by GPS, computes your Strokes Gained, and shows exactly where to gain points — from the tee to the putting green.',
+  homeStart: '▶ START PLAYING',
+  homeSignIn: 'Sign in with Google',
+  homeGuestNote: 'No account needed — play as a guest, sign in to sync.',
+  homeHow: 'HOW IT WORKS',
+  homeStep1Title: '1 · Record every shot',
+  homeStep1Body:
+    'START at the ball, walk, STOP where it lands. High-accuracy GPS measures the distance automatically.',
+  homeStep2Title: '2 · Log the result',
+  homeStep2Body:
+    'Fairway, rough, bunker, green or holed. Putting and short game via quick manual entry.',
+  homeStep3Title: '3 · Read your Strokes Gained',
+  homeStep3Body:
+    'Benchmark against any handicap or PRO level, sector by sector, and track your progress.',
+  homeFeatures: 'WHY SHOTIQ',
+  homeF1: '📍 Accurate multi-sample GPS',
+  homeF1b: 'Reliable measurement even standing still on course.',
+  homeF2: '📊 4-sector Strokes Gained',
+  homeF2b: 'Tee, approach, short game, putting — vs HC or PRO.',
+  homeF3: '📈 Progress tracking',
+  homeF3b: 'History, trends and CSV export.',
+  homeF4: '📲 Works offline',
+  homeF4b: 'Installable app, playable with no signal.',
+  homeCta: 'Ready to lower your scores?',
+  homeOpen: 'OPEN THE APP',
+  footerRights: 'ShotIQ · Strokes Gained Tracker',
+
+  account: 'Account',
+  guest: 'Guest',
+  signIn: 'Sign in',
+  signInGoogle: 'Google sign-in',
+  signOut: 'Sign out',
+  syncOn: 'Cloud sync enabled',
+  guestLocal: 'Guest mode · local data',
+  backHome: 'Home',
 };

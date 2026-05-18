@@ -34,15 +34,20 @@ export const historyStore = {
 };
 
 /**
- * Best-effort upsert of a finished session to Supabase. Never throws — a
- * failed sync just leaves the round in local history to retry later.
+ * Best-effort upsert of a finished session to Supabase. Only runs when a
+ * user is signed in (guests stay local-only). Never throws — a failed sync
+ * just leaves the round in local history to retry later.
  */
 export async function syncSession(s: ArchivedSession): Promise<void> {
   if (!supabase) return;
   try {
+    const { data } = await supabase.auth.getUser();
+    const userId = data.user?.id;
+    if (!userId) return;
     await supabase.from('sessions').upsert(
       {
         id: s.id,
+        user_id: userId,
         played_at: s.date,
         player: s.player,
         benchmark: JSON.stringify(s.benchmark),
@@ -59,10 +64,22 @@ export async function syncSession(s: ArchivedSession): Promise<void> {
   }
 }
 
+/** Push every locally-stored finished round to the cloud (called on login). */
+export async function syncAllLocal(): Promise<void> {
+  if (!supabase) return;
+  for (const s of historyStore.load()) {
+    // eslint-disable-next-line no-await-in-loop
+    await syncSession(s);
+  }
+}
+
 export async function deleteAllRemote(): Promise<void> {
   if (!supabase) return;
   try {
-    await supabase.from('sessions').delete().neq('id', '');
+    const { data } = await supabase.auth.getUser();
+    const userId = data.user?.id;
+    if (!userId) return;
+    await supabase.from('sessions').delete().eq('user_id', userId);
   } catch {
     /* ignore */
   }

@@ -23,10 +23,12 @@ import {
   currentStore,
   historyStore,
   syncSession,
+  syncAllLocal,
   deleteAllRemote,
 } from '../lib/storage';
+import { useAuth } from '../lib/auth';
 
-const DEFAULT_PLAYER = 'pierrick';
+const DEFAULT_PLAYER = 'Player';
 
 /** Assumed distance left after a chip/pitch/bunker shot, by where it stopped. */
 function assumedProximity(lie: Lie): number {
@@ -90,6 +92,7 @@ export interface AddShotInput {
 type Action =
   | { type: 'hydrate'; session: Session }
   | { type: 'setBenchmark'; benchmark: Benchmark }
+  | { type: 'setPlayer'; player: string }
   | { type: 'setPar'; par: Par }
   | { type: 'addShot'; input: AddShotInput }
   | { type: 'undoShot' }
@@ -164,6 +167,10 @@ function reducer(state: Session, action: Action): Session {
       return action.session;
     case 'setBenchmark':
       return { ...state, benchmark: action.benchmark };
+    case 'setPlayer':
+      return state.player === action.player
+        ? state
+        : { ...state, player: action.player };
     case 'setPar': {
       const holes = state.holes.slice();
       holes[holes.length - 1] = {
@@ -293,9 +300,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     () => historyStore.load(),
   );
 
+  const { user, displayName } = useAuth();
+
   useEffect(() => {
     currentStore.save(session);
   }, [session]);
+
+  // Tag the round with the signed-in name; push local history once on login.
+  useEffect(() => {
+    if (user && displayName) {
+      dispatch({ type: 'setPlayer', player: displayName });
+      void syncAllLocal();
+    }
+  }, [user, displayName]);
 
   const value = useMemo<SessionCtx>(() => {
     const persistArchive = (s: Session) => {

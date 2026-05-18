@@ -48,7 +48,7 @@ export function EvolutionPage() {
     datasets: [
       {
         data: sectorAvg,
-        backgroundColor: ['#5b9bd5', GREEN, '#d8a23a', '#7fdca0'],
+        backgroundColor: ['#45dffb', GREEN, '#ffc24b', '#9b8cff'],
         borderRadius: 6,
       },
     ],
@@ -169,12 +169,9 @@ export function EvolutionPage() {
       </div>
 
       <div className="cta">
-        <div className="tg">{t('ctaTagline')}</div>
-        <h3>{t('ctaTitle')}</h3>
-        <p>{t('ctaBody')}</p>
-        <button className="btn gold" style={{ marginTop: 12 }}>
-          {t('ctaButton')}
-        </button>
+        <div className="tg">{t('insightsTag')}</div>
+        <h3>{t('insightsTitle')}</h3>
+        <p>{t('insightsBody')}</p>
       </div>
     </>
   );
