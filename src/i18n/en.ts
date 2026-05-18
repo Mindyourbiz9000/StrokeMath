@@ -185,4 +185,14 @@ export const en: Record<keyof typeof fr, string> = {
   syncOn: 'Cloud sync enabled',
   guestLocal: 'Guest mode · local data',
   backHome: 'Home',
+
+  puttLength: 'Putt length',
+  puttNo: 'Putt {n}',
+  leaveLabel: 'Distance left after the putt',
+  holedIt: '🏁 HOLED IT',
+  missedPutt: 'Missed — set the leave',
+  confirmLeave: '✓ SAVE MISSED PUTT',
+  back: '← Back',
+  puttTapHint:
+    'Tap a distance, fine-tune by ±10 cm, then Holed or Missed. The leave becomes your next putt.',
 };

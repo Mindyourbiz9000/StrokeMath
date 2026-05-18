@@ -4,6 +4,7 @@ import { useSession, holeState } from '../../state/session';
 import { useToast } from '../Toast';
 import { haversine, combinedAccuracy, type GpsController } from '../../lib/geo';
 import { defaultHoleLength } from '../../lib/strokesGained';
+import { PuttEntry } from './PuttEntry';
 import type { GeoPoint, Lie, Par, ShotCategory } from '../../types';
 
 const CATEGORIES: { id: ShotCategory; t: string; s: string }[] = [
@@ -45,12 +46,6 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
   // Short game
   const [shortDist, setShortDist] = useState(20);
 
-  // Putting (metres + centimetres)
-  const [bM, setBM] = useState('');
-  const [bC, setBC] = useState('');
-  const [aM, setAM] = useState('');
-  const [aC, setAC] = useState('');
-
   const holeLength = useMemo(() => defaultHoleLength(hole.par), [hole.par]);
 
   // Reset transient state whenever the category or hole/shot changes.
@@ -80,10 +75,6 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
     setManual('');
     setManualMode(false);
     setPenalty(0);
-    setBM('');
-    setBC('');
-    setAM('');
-    setAC('');
   };
 
   const onStart = async () => {
@@ -144,27 +135,6 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
         toLie,
         distanceBefore: shortDist,
         penalty,
-        holeLength,
-      },
-    });
-    toast(t('shotSaved'));
-    resetAll();
-  };
-
-  const commitPutt = () => {
-    const before = Number(bM || 0) + Number(bC || 0) / 100;
-    const after = Number(aM || 0) + Number(aC || 0) / 100;
-    if (before <= 0) {
-      toast(t('puttHint'));
-      return;
-    }
-    dispatch({
-      type: 'addShot',
-      input: {
-        category: 'putt',
-        toLie: after <= 0 ? 'holed' : 'green',
-        distanceBefore: before,
-        distanceAfter: after,
         holeLength,
       },
     });
@@ -378,30 +348,7 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
       )}
 
       {/* Putting */}
-      {isPutt && (
-        <div className="card">
-          <div className="section-label">🥏 {t('puttingTitle')}</div>
-          <div className="muted" style={{ fontSize: 11, letterSpacing: 1 }}>
-            {t('beforePutt')}
-          </div>
-          <MeterCm m={bM} c={bC} setM={setBM} setC={setBC} />
-          <div
-            className="muted"
-            style={{ fontSize: 11, letterSpacing: 1, marginTop: 10 }}
-          >
-            {t('afterPutt')}
-          </div>
-          <MeterCm m={aM} c={aC} setM={setAM} setC={setAC} />
-          <button
-            className="btn green-fill"
-            style={{ marginTop: 14, fontSize: 16, padding: 16 }}
-            onClick={commitPutt}
-          >
-            {t('validatePutt')}
-          </button>
-          <p className="hint">{t('puttHint')}</p>
-        </div>
-      )}
+      {isPutt && <PuttEntry holeLength={holeLength} />}
     </>
   );
 }
@@ -423,43 +370,6 @@ function PenaltyStepper({
         <button onClick={() => onChange(Math.max(0, value - 1))}>−</button>
         <button onClick={() => onChange(Math.min(3, value + 1))}>+</button>
       </span>
-    </div>
-  );
-}
-
-function MeterCm({
-  m,
-  c,
-  setM,
-  setC,
-}: {
-  m: string;
-  c: string;
-  setM: (v: string) => void;
-  setC: (v: string) => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <div className="mc-grid">
-      <div className="field">
-        <label>{t('meters')}</label>
-        <input
-          inputMode="numeric"
-          value={m}
-          onChange={(e) => setM(e.target.value.replace(/\D/g, ''))}
-          placeholder="0"
-        />
-      </div>
-      <div className="sep">,</div>
-      <div className="field">
-        <label>CM</label>
-        <input
-          inputMode="numeric"
-          value={c}
-          onChange={(e) => setC(e.target.value.replace(/\D/g, '').slice(0, 2))}
-          placeholder="00"
-        />
-      </div>
     </div>
   );
 }

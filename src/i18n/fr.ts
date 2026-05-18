@@ -183,4 +183,14 @@ export const fr = {
   syncOn: 'Synchronisation cloud activée',
   guestLocal: 'Mode invité · données locales',
   backHome: 'Accueil',
+
+  puttLength: 'Longueur du putt',
+  puttNo: 'Putt {n}',
+  leaveLabel: 'Distance restante après le putt',
+  holedIt: '🏁 RENTRÉ',
+  missedPutt: 'Manqué — saisir la distance restante',
+  confirmLeave: '✓ VALIDER LE PUTT MANQUÉ',
+  back: '← Retour',
+  puttTapHint:
+    'Touchez une distance, ajustez de ±10 cm, puis Rentré ou Manqué. La distance restante devient le putt suivant.',
 } as const;
