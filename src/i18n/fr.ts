@@ -188,8 +188,8 @@ export const fr = {
   puttNo: 'Putt {n}',
   leaveLabel: 'Distance restante après le putt',
   holedIt: '🏁 RENTRÉ',
-  missedPutt: 'Manqué — saisir la distance restante',
-  confirmLeave: '✓ VALIDER LE PUTT MANQUÉ',
+  missedPutt: 'MANQUÉ',
+  confirmLeave: '✓ VALIDER',
   back: '← Retour',
   puttTapHint:
     'Touchez une distance, ajustez de ±10 cm, puis Rentré ou Manqué. La distance restante devient le putt suivant.',

@@ -114,42 +114,23 @@ export function PuttEntry({ holeLength }: { holeLength: number }) {
       </div>
 
       {phase === 'putt' ? (
-        <>
-          <button
-            className="btn green-fill"
-            style={{ marginTop: 18 }}
-            onClick={() => save(true)}
-          >
-            {t('holedIt')}
-          </button>
-          <button
-            className="btn ghost"
-            style={{ marginTop: 10 }}
-            onClick={() => {
-              setLeave(0.5);
-              setPhase('leave');
-            }}
-          >
+        <div className="btn-row">
+          <button className="btn ghost tap" onClick={() => { setLeave(0.5); setPhase('leave'); }}>
             {t('missedPutt')}
           </button>
-        </>
-      ) : (
-        <>
-          <button
-            className="btn green-fill"
-            style={{ marginTop: 18 }}
-            onClick={() => save(false)}
-          >
-            {t('confirmLeave')}
+          <button className="btn green-fill tap" onClick={() => save(true)}>
+            {t('holedIt')}
           </button>
-          <button
-            className="btn ghost"
-            style={{ marginTop: 10 }}
-            onClick={() => setPhase('putt')}
-          >
+        </div>
+      ) : (
+        <div className="btn-row">
+          <button className="btn ghost tap" onClick={() => setPhase('putt')}>
             {t('back')}
           </button>
-        </>
+          <button className="btn green-fill tap" onClick={() => save(false)}>
+            {t('confirmLeave')}
+          </button>
+        </div>
       )}
 
       <p className="hint center">{t('puttTapHint')}</p>
