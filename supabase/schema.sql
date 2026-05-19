@@ -16,8 +16,16 @@ create table if not exists public.sessions (
   total_strokes_gained  numeric not null default 0,
   sectors               jsonb   not null default '{}'::jsonb,
   perf_hc               numeric not null default 0,
+  deleted               boolean not null default false,
   created_at            timestamptz not null default now()
 );
+
+-- Migration for projects created before two-way sync (idempotent):
+alter table public.sessions
+  add column if not exists deleted boolean not null default false;
+
+create index if not exists sessions_user_active_idx
+  on public.sessions (user_id, deleted, played_at desc);
 
 create index if not exists sessions_user_played_idx
   on public.sessions (user_id, played_at desc);

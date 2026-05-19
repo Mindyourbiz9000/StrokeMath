@@ -158,13 +158,27 @@ export function exportBackup(): string {
  * user is signed in (guests stay local-only). Never throws — a failed sync
  * just leaves the round in local history to retry later.
  */
-export async function syncSession(s: ArchivedSession): Promise<void> {
-  if (!supabase) return;
+const UNSYNCED_KEY = 'strokemath.unsynced';
+
+function unsynced(): string[] {
+  const x = readRaw(UNSYNCED_KEY);
+  return Array.isArray(x) ? (x.filter((i) => typeof i === 'string') as string[]) : [];
+}
+function setUnsynced(ids: string[]): void {
   try {
-    const { data } = await supabase.auth.getUser();
-    const userId = data.user?.id;
-    if (!userId) return;
-    await supabase.from('sessions').upsert(
+    localStorage.setItem(UNSYNCED_KEY, JSON.stringify([...new Set(ids)]));
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function syncSession(
+  s: ArchivedSession,
+  userId: string,
+): Promise<boolean> {
+  if (!supabase || !userId) return false;
+  try {
+    const { error } = await supabase.from('sessions').upsert(
       {
         id: s.id,
         user_id: userId,
@@ -176,30 +190,110 @@ export async function syncSession(s: ArchivedSession): Promise<void> {
         total_strokes_gained: s.totalStrokesGained,
         sectors: s.sectors,
         perf_hc: s.perfHc,
+        deleted: false,
       },
       { onConflict: 'id' },
     );
+    if (error) {
+      setUnsynced([...unsynced(), s.id]);
+      return false;
+    }
+    setUnsynced(unsynced().filter((id) => id !== s.id));
+    return true;
   } catch {
-    /* offline / RLS — keep local copy */
+    setUnsynced([...unsynced(), s.id]);
+    return false;
   }
 }
 
-/** Push every locally-stored finished round to the cloud (called on login). */
-export async function syncAllLocal(): Promise<void> {
-  if (!supabase) return;
-  for (const s of historyStore.load()) {
-    // eslint-disable-next-line no-await-in-loop
-    await syncSession(s);
-  }
+interface RemoteRow {
+  id: string;
+  played_at: string;
+  player: string;
+  benchmark: string;
+  holes_played: number;
+  shots_played: number;
+  total_strokes_gained: number;
+  sectors: ArchivedSession['sectors'];
+  perf_hc: number;
 }
 
-export async function deleteAllRemote(): Promise<void> {
-  if (!supabase) return;
+function rowToArchived(r: RemoteRow): ArchivedSession | null {
   try {
-    const { data } = await supabase.auth.getUser();
-    const userId = data.user?.id;
-    if (!userId) return;
-    await supabase.from('sessions').delete().eq('user_id', userId);
+    return {
+      id: r.id,
+      date: r.played_at,
+      player: r.player,
+      benchmark: JSON.parse(r.benchmark),
+      holesPlayed: r.holes_played,
+      shotsPlayed: r.shots_played,
+      totalStrokesGained: Number(r.total_strokes_gained),
+      sectors: r.sectors,
+      perfHc: Number(r.perf_hc),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Pull the user's cloud rounds and merge with local (union by id). */
+export async function pullAndMerge(userId: string): Promise<ArchivedSession[]> {
+  const local = historyStore.load();
+  if (!supabase || !userId) return local;
+  try {
+    const { data, error } = await supabase
+      .from('sessions')
+      .select(
+        'id,played_at,player,benchmark,holes_played,shots_played,total_strokes_gained,sectors,perf_hc',
+      )
+      .eq('user_id', userId)
+      .eq('deleted', false);
+    if (error || !data) return local;
+    const byId = new Map<string, ArchivedSession>();
+    for (const s of local) byId.set(s.id, s);
+    for (const row of data as RemoteRow[]) {
+      const a = rowToArchived(row);
+      // Local wins on conflict (it may carry sectorShots the cloud lacks).
+      if (a && !byId.has(a.id)) byId.set(a.id, a);
+    }
+    const merged = [...byId.values()].sort(
+      (x, y) => +new Date(y.date) - +new Date(x.date),
+    );
+    historyStore.save(merged);
+    return merged;
+  } catch {
+    return local;
+  }
+}
+
+/** Push local rounds the cloud is missing + retry anything queued. */
+export async function pushUnsynced(userId: string): Promise<void> {
+  if (!supabase || !userId) return;
+  const queued = new Set(unsynced());
+  for (const s of historyStore.load()) {
+    if (!queued.size || queued.has(s.id)) {
+      // eslint-disable-next-line no-await-in-loop
+      await syncSession(s, userId);
+    }
+  }
+}
+
+/** Login reconciliation: pull remote, merge, then push local-only. */
+export async function reconcile(userId: string): Promise<ArchivedSession[]> {
+  const merged = await pullAndMerge(userId);
+  await pushUnsynced(userId);
+  return merged;
+}
+
+/** Soft-delete the user's cloud rounds (recoverable, multi-device safe). */
+export async function softDeleteRemote(userId: string): Promise<void> {
+  if (!supabase || !userId) return;
+  setUnsynced([]);
+  try {
+    await supabase
+      .from('sessions')
+      .update({ deleted: true })
+      .eq('user_id', userId);
   } catch {
     /* ignore */
   }

@@ -26,8 +26,9 @@ import {
   currentStore,
   historyStore,
   syncSession,
-  syncAllLocal,
-  deleteAllRemote,
+  reconcile,
+  pushUnsynced,
+  softDeleteRemote,
 } from '../lib/storage';
 import { useAuth } from '../lib/auth';
 
@@ -434,15 +435,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     saveBenchmarkPref(session.benchmark);
   }, [session.benchmark]);
 
-  // Tag the round with the signed-in name, restore the account's saved
-  // benchmark, and push local history once on login.
+  const userId = user?.id ?? '';
+
+  // On login: restore name + saved benchmark, then pull/merge cloud history
+  // and push anything the cloud is missing.
   useEffect(() => {
     if (!user) return;
     if (displayName) dispatch({ type: 'setPlayer', player: displayName });
     const saved = loadBenchmarkPref(user.user_metadata?.benchmark);
     if (saved) dispatch({ type: 'setBenchmark', benchmark: saved });
-    void syncAllLocal();
+    reconcile(user.id).then(setHistory).catch(() => {});
   }, [user, displayName]);
+
+  // Retry queued syncs when connectivity returns.
+  useEffect(() => {
+    if (!userId) return;
+    const onOnline = () => void pushUnsynced(userId);
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, [userId]);
 
   const value = useMemo<SessionCtx>(() => {
     const persistArchive = (s: Session) => {
@@ -454,7 +465,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       ];
       historyStore.save(next);
       setHistory(next);
-      void syncSession(archived);
+      if (userId) void syncSession(archived, userId);
     };
 
     return {
@@ -468,10 +479,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       clearHistory: () => {
         historyStore.clear();
         setHistory([]);
-        void deleteAllRemote();
+        if (userId) void softDeleteRemote(userId);
       },
     };
-  }, [session, history]);
+  }, [session, history, userId]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
