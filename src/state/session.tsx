@@ -105,6 +105,7 @@ type Action =
   | { type: 'setPin'; pin: GeoPoint | null }
   | { type: 'setHoleLength'; lengthM: number | null }
   | { type: 'addShot'; input: AddShotInput }
+  | { type: 'deleteShot'; shotId: string }
   | { type: 'undoShot' }
   | { type: 'completeHole' }
   | { type: 'nextHole' }
@@ -301,6 +302,20 @@ function reducer(state: Session, action: Action): Session {
       const holes = state.holes.slice();
       holes[holes.length - 1] = { ...hole, shots: [...hole.shots, shot] };
       return { ...state, holes };
+    }
+    case 'deleteShot': {
+      const hole = currentHole(state);
+      const kept = hole.shots
+        .filter((s) => s.id !== action.shotId)
+        .map((s, i) => ({ ...s, number: i + 1 }));
+      if (kept.length === hole.shots.length) return state;
+      const holes = state.holes.slice();
+      holes[holes.length - 1] = {
+        ...hole,
+        shots: kept,
+        completed: kept.length > 0 && hole.completed,
+      };
+      return rescoreCurrentHole({ ...state, holes });
     }
     case 'undoShot': {
       const hole = currentHole(state);

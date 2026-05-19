@@ -161,6 +161,9 @@ export const fr = {
   pinClear: 'Effacer',
   pinHint:
     'Optionnel : capturez le drapeau (au green) pour une distance au trou exacte. Sinon, saisissez la longueur du trou.',
+  toPinLive: '▸ {m} m au drapeau',
+  deleteShot: 'Supprimer ce coup',
+  deleteShotConfirm: 'Supprimer ce coup ? Les suivants seront recalculés.',
 
   homeHeroTitle: 'Le golf, mesuré au coup près.',
   homeHeroSub:

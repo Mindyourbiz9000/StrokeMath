@@ -84,6 +84,7 @@ export function ShotHistory() {
                 <th>{t('colArrival')}</th>
                 <th className="r">{t('colDist')}</th>
                 <th className="r">{t('colSg')}</th>
+                <th aria-label="actions" />
               </tr>
             </thead>
             <tbody>
@@ -117,6 +118,18 @@ export function ShotHistory() {
                       }`}
                     >
                       {sg(s.strokesGained)}
+                    </td>
+                    <td className="r">
+                      <button
+                        className="row-del"
+                        aria-label={t('deleteShot')}
+                        onClick={() => {
+                          if (window.confirm(t('deleteShotConfirm')))
+                            dispatch({ type: 'deleteShot', shotId: s.id });
+                        }}
+                      >
+                        ✕
+                      </button>
                     </td>
                   </tr>
                 ))}

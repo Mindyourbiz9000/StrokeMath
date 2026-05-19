@@ -475,6 +475,28 @@ table.hist td.r,
   justify-content: center;
   flex: 0 0 22px;
 }
+.row-del {
+  color: var(--muted);
+  font-size: 14px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  line-height: 1;
+}
+.row-del:active {
+  color: var(--neg);
+  background: var(--danger-soft);
+}
+.topin-live {
+  text-align: center;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--accent);
+  background: var(--accent-tint);
+  border: 1px solid var(--accent-line);
+  border-radius: 12px;
+  padding: 10px;
+  font-variant-numeric: tabular-nums;
+}
 .step-done {
   display: flex;
   align-items: center;

@@ -3,7 +3,7 @@ import { useI18n } from '../../i18n';
 import { useSession, holeState } from '../../state/session';
 import { useToast } from '../Toast';
 import { defaultHoleLength } from '../../lib/strokesGained';
-import type { GpsController } from '../../lib/geo';
+import { haversine, type GpsController } from '../../lib/geo';
 import type { Par } from '../../types';
 
 /**
@@ -87,7 +87,21 @@ export function HoleSetup({ gps }: { gps: GpsController }) {
             {t('pinClear')}
           </button>
         </div>
-      ) : (
+      ) : null}
+
+      {hole.pin && gps.current && (
+        <div
+          className="topin-live"
+          aria-live="polite"
+          style={{ marginTop: 10 }}
+        >
+          {t('toPinLive', {
+            m: Math.round(haversine(gps.current, hole.pin)),
+          })}
+        </div>
+      )}
+
+      {!hole.pin && (
         <button
           className="btn ghost"
           style={{ marginTop: 14 }}

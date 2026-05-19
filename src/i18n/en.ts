@@ -162,6 +162,9 @@ export const en: Record<keyof typeof fr, string> = {
   pinClear: 'Clear',
   pinHint:
     'Optional: capture the flag (at the green) for exact distance-to-pin. Otherwise enter the hole length.',
+  toPinLive: '▸ {m} m to the pin',
+  deleteShot: 'Delete this shot',
+  deleteShotConfirm: 'Delete this shot? The following ones are recalculated.',
 
   homeHeroTitle: 'Golf, measured shot by shot.',
   homeHeroSub:
