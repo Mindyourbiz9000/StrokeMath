@@ -2,7 +2,9 @@ import type { Session } from '../types';
 import { benchmarkLabel } from './format';
 
 function cell(v: string | number): string {
-  const s = String(v);
+  let s = String(v);
+  // Neutralise spreadsheet formula injection (=, +, -, @, tab, CR leads).
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
   return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
