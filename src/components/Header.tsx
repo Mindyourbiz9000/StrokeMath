@@ -1,7 +1,13 @@
 import { useI18n, type Lang } from '../i18n';
 import { useAuth } from '../lib/auth';
 
-export function Header({ onHome }: { onHome: () => void }) {
+export function Header({
+  onHome,
+  onSignedOut,
+}: {
+  onHome: () => void;
+  onSignedOut: () => void;
+}) {
   const { t, lang, setLang } = useI18n();
   const { cloudEnabled, user, displayName, signInWithGoogle, signOut } =
     useAuth();
@@ -34,7 +40,13 @@ export function Header({ onHome }: { onHome: () => void }) {
             <span className="acc-name">
               <span className="acc-dot ok" /> {displayName}
             </span>
-            <button className="acc-btn" onClick={() => void signOut()}>
+            <button
+              className="acc-btn"
+              onClick={async () => {
+                await signOut();
+                onSignedOut();
+              }}
+            >
               {t('signOut')}
             </button>
           </>

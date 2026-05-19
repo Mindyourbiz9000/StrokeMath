@@ -37,7 +37,13 @@ export function App() {
   return (
     <GpsProvider>
       <div className="app">
-        <Header onHome={() => setView('home')} />
+        <Header
+          onHome={() => setView('home')}
+          onSignedOut={() => {
+            localStorage.removeItem(ENTERED_KEY);
+            setView('home');
+          }}
+        />
         <div className="scroll" key={tab}>
           {tab === 'play' ? (
             <JeuPage onConsult={() => setTab('evolution')} />
