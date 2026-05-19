@@ -341,7 +341,9 @@ function reducer(state: Session, action: Action): Session {
       const hole = currentHole(state);
       const holes = state.holes.slice();
       if (!hole.completed) holes[holes.length - 1] = { ...hole, completed: true };
-      holes.push(newHole(hole.number + 1, hole.par));
+      // Par 4 is the most common; default to it rather than inheriting the
+      // previous hole's par.
+      holes.push(newHole(hole.number + 1, 4));
       return { ...state, holes };
     }
     case 'newRound':
