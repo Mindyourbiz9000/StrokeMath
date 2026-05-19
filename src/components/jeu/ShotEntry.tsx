@@ -205,7 +205,7 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
 
   return (
     <>
-      <HoleSetup gps={gps} />
+      <HoleSetup />
 
       {/* Category */}
       <div className="card">

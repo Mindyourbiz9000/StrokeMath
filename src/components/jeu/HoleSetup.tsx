@@ -1,37 +1,20 @@
-import { useState } from 'react';
 import { useI18n } from '../../i18n';
 import { useSession, holeState } from '../../state/session';
-import { useToast } from '../Toast';
 import { defaultHoleLength } from '../../lib/strokesGained';
-import { haversine, type GpsController } from '../../lib/geo';
 import type { Par } from '../../types';
 
 /**
- * Per-hole setup: par, optional hole length, and optional GPS flag capture.
- * The pin position turns every drive/approach into an exact distance-to-pin
- * (true Strokes Gained) instead of a shot-length approximation.
+ * Per-hole setup: par + optional hole length (used as the tee baseline).
+ * Walking to the flag to GPS the pin isn't a realistic on-course flow, so
+ * that button is removed; the `hole.pin` data model stays in place for a
+ * future map-tap pin placement.
  */
-export function HoleSetup({ gps }: { gps: GpsController }) {
+export function HoleSetup() {
   const { t } = useI18n();
   const { session, dispatch } = useSession();
-  const toast = useToast();
 
   const hole = session.holes[session.holes.length - 1];
   const { count } = holeState(hole, defaultHoleLength(hole.par));
-  const [pinBusy, setPinBusy] = useState(false);
-
-  const capturePin = async () => {
-    setPinBusy(true);
-    try {
-      const r = await gps.capture();
-      dispatch({ type: 'setPin', pin: r.point });
-      toast(t('pinSet', { m: r.accuracy }));
-    } catch {
-      toast(t('gpsDenied'));
-    } finally {
-      setPinBusy(false);
-    }
-  };
 
   return (
     <div className="card">
@@ -67,51 +50,7 @@ export function HoleSetup({ gps }: { gps: GpsController }) {
           style={{ fontSize: 20 }}
         />
       </label>
-
-      {hole.pin ? (
-        <div
-          className="step-done"
-          style={{ marginTop: 14, justifyContent: 'space-between' }}
-        >
-          <span>{t('pinSet', { m: Math.round(hole.pin.accuracy ?? 0) })}</span>
-          <button
-            onClick={() => dispatch({ type: 'setPin', pin: null })}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--neg)',
-              fontSize: 12,
-              fontWeight: 600,
-            }}
-          >
-            {t('pinClear')}
-          </button>
-        </div>
-      ) : null}
-
-      {hole.pin && gps.current && (
-        <div
-          className="topin-live"
-          aria-live="polite"
-          style={{ marginTop: 10 }}
-        >
-          {t('toPinLive', {
-            m: Math.round(haversine(gps.current, hole.pin)),
-          })}
-        </div>
-      )}
-
-      {!hole.pin && (
-        <button
-          className="btn ghost"
-          style={{ marginTop: 14 }}
-          onClick={capturePin}
-          disabled={pinBusy}
-        >
-          {pinBusy ? t('pinCapturing') : t('pinCapture')}
-        </button>
-      )}
-      <p className="hint">{t('pinHint')}</p>
+      <p className="hint">{t('holeLengthHint')}</p>
     </div>
   );
 }
