@@ -3,6 +3,7 @@ import { Header } from './components/Header';
 import { TabBar, type Tab } from './components/TabBar';
 import { JeuPage } from './components/jeu/JeuPage';
 import { Home } from './components/Home';
+import { Faq } from './components/Faq';
 import { PwaStatus } from './components/PwaStatus';
 import { GpsProvider } from './lib/gpsContext';
 import { useWakeLock } from './lib/geo';
@@ -14,7 +15,7 @@ const EvolutionPage = lazy(() =>
   })),
 );
 
-type View = 'home' | 'app';
+type View = 'home' | 'app' | 'faq';
 const ENTERED_KEY = 'shotiq.entered';
 
 export function App() {
@@ -31,7 +32,20 @@ export function App() {
   useWakeLock(view === 'app');
 
   if (view === 'home') {
-    return <Home onEnter={() => setView('app')} />;
+    return (
+      <Home
+        onEnter={() => setView('app')}
+        onFaq={() => setView('faq')}
+      />
+    );
+  }
+  if (view === 'faq') {
+    return (
+      <Faq
+        onBack={() => setView('home')}
+        onOpenApp={() => setView('app')}
+      />
+    );
   }
 
   return (

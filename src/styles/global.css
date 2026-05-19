@@ -1143,6 +1143,119 @@ table.hist th.r {
   line-height: 1.5;
   margin: 0;
 }
+/* FAQ page */
+.faq-hero { padding: 40px 0 30px; }
+.faq-block p {
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--text-2);
+  margin: 0 0 12px;
+}
+.faq-block strong { color: var(--text); }
+.formula-card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  padding: 22px;
+  backdrop-filter: blur(20px);
+}
+.formula-card .formula {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  background: linear-gradient(140deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-align: center;
+  margin-bottom: 14px;
+}
+.formula-card .formula em {
+  font-style: italic;
+  font-weight: 600;
+}
+.formula-card p {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin: 0;
+}
+.sector-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sector-list li {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sector-list strong {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text);
+}
+.sector-list span {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.qa-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.qa {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.qa summary {
+  list-style: none;
+  padding: 16px 18px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14.5px;
+  color: var(--text);
+  position: relative;
+  padding-right: 44px;
+}
+.qa summary::-webkit-details-marker { display: none; }
+.qa summary::after {
+  content: '+';
+  position: absolute;
+  right: 16px;
+  top: 14px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent-tint);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 22px;
+  text-align: center;
+  transition: transform 0.2s;
+}
+.qa[open] summary::after { content: '−'; }
+.qa-body {
+  padding: 0 18px 18px;
+  color: var(--text-2);
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+.qa-body p { margin: 0; }
+.qa-body em { color: var(--text); font-style: italic; }
+.qa-body strong { color: var(--text); }
+
 .home-final {
   text-align: center;
   padding: 54px 0 26px;

@@ -203,6 +203,7 @@ export const en: Record<keyof typeof fr, string> = {
   homeCta: 'Ready to lower your scores?',
   homeOpen: 'OPEN THE APP',
   footerRights: 'ShotIQ · Strokes Gained Tracker',
+  faqLink: 'FAQ',
 
   account: 'Account',
   guest: 'Guest',

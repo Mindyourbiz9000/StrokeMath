@@ -1,7 +1,13 @@
 import { useI18n, type Lang } from '../i18n';
 import { useAuth } from '../lib/auth';
 
-export function Home({ onEnter }: { onEnter: () => void }) {
+export function Home({
+  onEnter,
+  onFaq,
+}: {
+  onEnter: () => void;
+  onFaq: () => void;
+}) {
   const { t, lang, setLang } = useI18n();
   const { cloudEnabled, user, displayName, signInWithGoogle } = useAuth();
 
@@ -37,6 +43,9 @@ export function Home({ onEnter }: { onEnter: () => void }) {
               </button>
             ))}
           </div>
+          <button className="link-btn" onClick={onFaq}>
+            {t('faqLink')}
+          </button>
           {cloudEnabled && !user && (
             <button className="link-btn" onClick={() => void signInWithGoogle()}>
               {t('signIn')}
@@ -117,6 +126,10 @@ export function Home({ onEnter }: { onEnter: () => void }) {
       <footer className="home-footer">
         <span className="brand-mark sm" />
         {t('footerRights')} · © {new Date().getFullYear()}
+        <span className="muted"> · </span>
+        <button className="link-btn" onClick={onFaq}>
+          {t('faqLink')}
+        </button>
       </footer>
     </div>
   );

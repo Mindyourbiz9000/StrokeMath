@@ -202,6 +202,7 @@ export const fr = {
   homeCta: 'Prêt à baisser votre score ?',
   homeOpen: 'OUVRIR L’APPLICATION',
   footerRights: 'ShotIQ · Strokes Gained Tracker',
+  faqLink: 'FAQ',
 
   account: 'Compte',
   guest: 'Invité',
