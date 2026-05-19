@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { exportBackup } from '../lib/storage';
+import { reportError } from '../lib/report';
 
 interface Props {
   children: ReactNode;
@@ -35,8 +36,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    // eslint-disable-next-line no-console
-    console.error('[ShotIQ] render error', error, info.componentStack);
+    reportError(error, `render${info.componentStack ?? ''}`);
   }
 
   private exportData = () => {

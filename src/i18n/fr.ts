@@ -164,6 +164,9 @@ export const fr = {
   toPinLive: '▸ {m} m au drapeau',
   deleteShot: 'Supprimer ce coup',
   deleteShotConfirm: 'Supprimer ce coup ? Les suivants seront recalculés.',
+  pwaUpdate: 'Nouvelle version disponible',
+  pwaReload: 'Mettre à jour',
+  pwaOffline: '○ Hors-ligne — vos données sont enregistrées localement',
 
   homeHeroTitle: 'Le golf, mesuré au coup près.',
   homeHeroSub:

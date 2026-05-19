@@ -6,7 +6,10 @@ import { AuthProvider } from './lib/auth';
 import { SessionProvider } from './state/session';
 import { ToastProvider } from './components/Toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { installGlobalErrorHandlers } from './lib/report';
 import './styles/global.css';
+
+installGlobalErrorHandlers();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

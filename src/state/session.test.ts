@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { buildShot, rescoreHole } from './session';
+import {
+  buildShot,
+  rescoreHole,
+  perfHc,
+  archive,
+  sectorShotCounts,
+} from './session';
+import type { Session } from '../types';
 import { haversine } from '../lib/geo';
 import type { Benchmark, GeoPoint, Hole } from '../types';
 
@@ -98,5 +105,54 @@ describe('buildShot — pin-aware distance', () => {
     );
     expect(shot.remainingAfter).toBe(0);
     expect(shot.toLie).toBe('holed');
+  });
+});
+
+function roundWith(sg: number, shots: number): Session {
+  return {
+    id: 'r',
+    date: '2026-05-19T10:00:00Z',
+    player: 'p',
+    benchmark: { kind: 'hc', hc: 10 },
+    archived: false,
+    holes: [
+      {
+        id: 'h',
+        number: 1,
+        par: 4,
+        completed: true,
+        shots: Array.from({ length: shots }, (_, i) => ({
+          id: `s${i}`,
+          number: i + 1,
+          category: i === 0 ? 'drive' : i === shots - 1 ? 'putt' : 'approach',
+          fromLie: 'fairway',
+          toLie: i === shots - 1 ? 'holed' : 'fairway',
+          distance: 100,
+          remainingAfter: 0,
+          strokesGained: sg / shots,
+          penalty: 0,
+        })),
+      },
+    ],
+  };
+}
+
+describe('perfHc & archive', () => {
+  it('better scoring yields a lower performance handicap', () => {
+    const good = perfHc(roundWith(4, 8));
+    const bad = perfHc(roundWith(-6, 8));
+    expect(good).toBeLessThan(bad);
+    expect(good).toBeGreaterThanOrEqual(0);
+  });
+
+  it('archive records per-sector shot counts', () => {
+    const a = archive(roundWith(0, 5));
+    expect(a.sectorShots).toBeDefined();
+    const counts = sectorShotCounts(roundWith(0, 5));
+    const total =
+      counts.drive + counts.approach + counts.short + counts.putt;
+    expect(total).toBe(5);
+    expect(counts.drive).toBe(1);
+    expect(counts.putt).toBe(1);
   });
 });

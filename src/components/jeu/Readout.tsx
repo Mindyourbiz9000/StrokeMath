@@ -13,7 +13,7 @@ export function Readout() {
 
   return (
     <div className="card">
-      <div className="readout">
+      <div className="readout" aria-live="polite">
         <div>
           <div className="label">{t('distance')}</div>
           <div className="num pos">{dist.toFixed(2)}</div>

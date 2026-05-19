@@ -111,7 +111,7 @@ export function ShotHistory() {
                         <span className="tag red">+{s.penalty}</span>
                       )}
                     </td>
-                    <td className="r">{Math.round(s.distance)}M</td>
+                    <td className="r">{Math.round(s.distance)} m</td>
                     <td
                       className={`r ${
                         s.strokesGained >= 0 ? 'pos' : 'neg'

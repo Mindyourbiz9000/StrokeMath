@@ -165,6 +165,9 @@ export const en: Record<keyof typeof fr, string> = {
   toPinLive: '▸ {m} m to the pin',
   deleteShot: 'Delete this shot',
   deleteShotConfirm: 'Delete this shot? The following ones are recalculated.',
+  pwaUpdate: 'New version available',
+  pwaReload: 'Update',
+  pwaOffline: '○ Offline — your data is saved locally',
 
   homeHeroTitle: 'Golf, measured shot by shot.',
   homeHeroSub:

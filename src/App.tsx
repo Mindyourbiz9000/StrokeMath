@@ -1,11 +1,18 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Header } from './components/Header';
 import { TabBar, type Tab } from './components/TabBar';
 import { JeuPage } from './components/jeu/JeuPage';
-import { EvolutionPage } from './components/evolution/EvolutionPage';
 import { Home } from './components/Home';
+import { PwaStatus } from './components/PwaStatus';
 import { GpsProvider } from './lib/gpsContext';
 import { useWakeLock } from './lib/geo';
+
+// Évolution pulls in Chart.js — load it only when that tab is opened.
+const EvolutionPage = lazy(() =>
+  import('./components/evolution/EvolutionPage').then((m) => ({
+    default: m.EvolutionPage,
+  })),
+);
 
 type View = 'home' | 'app';
 const ENTERED_KEY = 'shotiq.entered';
@@ -35,10 +42,13 @@ export function App() {
           {tab === 'play' ? (
             <JeuPage onConsult={() => setTab('evolution')} />
           ) : (
-            <EvolutionPage />
+            <Suspense fallback={<div className="empty">…</div>}>
+              <EvolutionPage />
+            </Suspense>
           )}
         </div>
         <TabBar tab={tab} onChange={setTab} />
+        <PwaStatus />
       </div>
     </GpsProvider>
   );

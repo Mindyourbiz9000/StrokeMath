@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useI18n } from '../../i18n';
 import { useSession, holeState } from '../../state/session';
 import { useToast } from '../Toast';
+import { buzz } from '../../lib/haptics';
 
 const round1 = (x: number) => Math.round(x * 10) / 10;
 const clamp = (x: number) => Math.min(30, Math.max(0.1, round1(x)));
@@ -48,6 +49,7 @@ export function PuttEntry({ holeLength }: { holeLength: number }) {
       },
     });
     toast(t('shotSaved'));
+    buzz(holed ? [16, 50, 16] : 16);
     if (holed) {
       setLen(seed);
     } else {

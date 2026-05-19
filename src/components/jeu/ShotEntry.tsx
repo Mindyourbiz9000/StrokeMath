@@ -4,6 +4,7 @@ import { useSession } from '../../state/session';
 import { useToast } from '../Toast';
 import { haversine, combinedAccuracy, type GpsController } from '../../lib/geo';
 import { defaultHoleLength } from '../../lib/strokesGained';
+import { buzz } from '../../lib/haptics';
 import { PuttEntry } from './PuttEntry';
 import { HoleSetup } from './HoleSetup';
 import type { GeoPoint, Lie, ShotCategory } from '../../types';
@@ -90,6 +91,7 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
       setEndPt(null);
       setMeasured(null);
       setMeasuredAcc(null);
+      buzz();
     } catch {
       toast(t('gpsDenied'));
       setManualMode(true);
@@ -109,6 +111,7 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
       setEndPt(r.point);
       setMeasured(+haversine(startPt, r.point).toFixed(2));
       setMeasuredAcc(combinedAccuracy(startAcc ?? undefined, r.accuracy));
+      buzz([14, 40, 14]);
     } catch {
       toast(t('gpsDenied'));
       setManualMode(true);
@@ -136,7 +139,11 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
       },
     });
     toast(t('shotSaved'));
+    buzz();
+    // After a tee shot the next shot is almost always the approach.
+    const nextCat = category === 'drive' ? 'approach' : category;
     resetAll();
+    setCategory(nextCat);
   };
 
   const commitShort = () => {
@@ -152,6 +159,7 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
       },
     });
     toast(t('shotSaved'));
+    buzz();
     resetAll();
   };
 
@@ -358,7 +366,7 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
       {isShort && (
         <div className="card">
           <div className="section-label">🟢 {t('shortGame')}</div>
-          <div className="bignum">{shortDist} M</div>
+          <div className="bignum">{shortDist} m</div>
           <input
             type="range"
             min={1}
@@ -367,8 +375,8 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
             onChange={(e) => setShortDist(Number(e.target.value))}
           />
           <div className="range-ends">
-            <span>1M</span>
-            <span>30M</span>
+            <span>1 m</span>
+            <span>30 m</span>
           </div>
           <label className="field" style={{ display: 'block', marginTop: 12 }}>
             <span className="muted" style={{ fontSize: 11, letterSpacing: 1 }}>
@@ -417,8 +425,12 @@ function PenaltyStepper({
         ⚠️ {t('penalty')} · {t('penaltyStrokes', { n: value })}
       </span>
       <span style={{ display: 'flex', gap: 8 }}>
-        <button onClick={() => onChange(Math.max(0, value - 1))}>−</button>
-        <button onClick={() => onChange(Math.min(3, value + 1))}>+</button>
+        <button aria-label="−1" onClick={() => onChange(Math.max(0, value - 1))}>
+          −
+        </button>
+        <button aria-label="+1" onClick={() => onChange(Math.min(3, value + 1))}>
+          +
+        </button>
       </span>
     </div>
   );

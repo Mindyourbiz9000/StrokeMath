@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { fr } from './fr';
 import { en } from './en';
+import { setFormatLocale } from '../lib/format';
 
 export type Lang = 'fr' | 'en';
 type Key = keyof typeof fr;
@@ -33,10 +34,12 @@ function detectLang(): Lang {
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(detectLang);
+  setFormatLocale(lang); // keep number/date formatting in sync on first render
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, lang);
     document.documentElement.lang = lang;
+    setFormatLocale(lang);
   }, [lang]);
 
   const setLang = useCallback((l: Lang) => setLangState(l), []);
