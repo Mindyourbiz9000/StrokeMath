@@ -118,12 +118,11 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
   };
 
   const commitGps = () => {
-    const dist = manualMode
-      ? manual
-        ? Number(manual)
-        : null
-      : measured;
-    if (dist == null || !toLie) return;
+    const dist = manualMode ? Number(manual) : measured;
+    if (dist == null || !Number.isFinite(dist) || dist < 0 || !toLie) {
+      if (manualMode) toast(t('gpsDenied'));
+      return;
+    }
     dispatch({
       type: 'addShot',
       input: {

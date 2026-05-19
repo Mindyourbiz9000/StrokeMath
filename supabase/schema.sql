@@ -41,6 +41,14 @@ create policy "own sessions write"
   with check (auth.uid() = user_id);
 
 -- ─────────────────────────────────────────────────────────────────────────
+-- Saved handicap / PRO preference: NO migration required. It is stored in
+-- the signed-in user's auth metadata via supabase.auth.updateUser({ data:
+-- { benchmark } }) — i.e. auth.users.raw_user_meta_data, managed by Supabase
+-- Auth. Guests keep it in localStorage. (Per-sector shot counts used by the
+-- Évolution chart are local-only and likewise need no column.)
+-- ─────────────────────────────────────────────────────────────────────────
+
+-- ─────────────────────────────────────────────────────────────────────────
 -- Google OAuth setup (one-time, in the Supabase dashboard):
 --   1. Authentication → Providers → Google → enable.
 --   2. Add your Google OAuth client ID + secret

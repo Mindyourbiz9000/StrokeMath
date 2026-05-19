@@ -20,7 +20,8 @@ import type {
 } from '../types';
 import { uid } from '../lib/format';
 import { haversine } from '../lib/geo';
-import { strokesGained } from '../lib/strokesGained';
+import { strokesGained, defaultHoleLength } from '../lib/strokesGained';
+import { loadBenchmarkPref, saveBenchmarkPref } from '../lib/prefs';
 import {
   currentStore,
   historyStore,
@@ -189,23 +190,92 @@ export function buildShot(
   };
 }
 
+/** Reconstruct the AddShotInput that produced a stored shot. */
+function shotToInput(shot: Shot, fallbackLen: number): AddShotInput {
+  const base = {
+    toLie: shot.toLie,
+    penalty: shot.penalty,
+    holeLength: fallbackLen,
+  };
+  if (shot.category === 'putt') {
+    return {
+      ...base,
+      category: 'putt',
+      distanceBefore: shot.distance,
+      distanceAfter: shot.remainingAfter,
+    };
+  }
+  if (shot.category === 'short' || shot.category === 'bunker') {
+    return { ...base, category: shot.category, distanceBefore: shot.distance };
+  }
+  return {
+    ...base,
+    category: shot.category,
+    measuredDistance: shot.distance,
+    start: shot.start,
+    end: shot.end,
+  };
+}
+
+/**
+ * Re-score every shot of a hole from its stored inputs. Used when the pin or
+ * hole length is set *after* shots were entered (you capture the flag at the
+ * green), or when the benchmark changes — otherwise earlier shots keep their
+ * approximate SG forever.
+ */
+export function rescoreHole(hole: Hole, benchmark: Benchmark): Hole {
+  const fallbackLen = defaultHoleLength(hole.par);
+  let rebuilt: Hole = { ...hole, shots: [] };
+  for (const original of hole.shots) {
+    const ns = buildShot(rebuilt, shotToInput(original, fallbackLen), benchmark);
+    rebuilt = {
+      ...rebuilt,
+      shots: [
+        ...rebuilt.shots,
+        { ...ns, id: original.id, number: original.number },
+      ],
+    };
+  }
+  return rebuilt;
+}
+
+function rescoreCurrentHole(state: Session): Session {
+  const holes = state.holes.slice();
+  holes[holes.length - 1] = rescoreHole(
+    holes[holes.length - 1],
+    state.benchmark,
+  );
+  return { ...state, holes };
+}
+
 function reducer(state: Session, action: Action): Session {
   switch (action.type) {
     case 'hydrate':
       return action.session;
-    case 'setBenchmark':
-      return { ...state, benchmark: action.benchmark };
+    case 'setBenchmark': {
+      if (
+        state.benchmark.kind === action.benchmark.kind &&
+        (action.benchmark.kind === 'pro' ||
+          (state.benchmark as { hc: number }).hc ===
+            (action.benchmark as { hc: number }).hc)
+      ) {
+        return state;
+      }
+      // Re-score the whole round so every shot reflects the new benchmark.
+      const next = { ...state, benchmark: action.benchmark };
+      return {
+        ...next,
+        holes: next.holes.map((h) => rescoreHole(h, action.benchmark)),
+      };
+    }
     case 'setPlayer':
       return state.player === action.player
         ? state
         : { ...state, player: action.player };
     case 'setPar': {
       const holes = state.holes.slice();
-      holes[holes.length - 1] = {
-        ...currentHole(state),
-        par: action.par,
-      };
-      return { ...state, holes };
+      holes[holes.length - 1] = { ...currentHole(state), par: action.par };
+      return rescoreCurrentHole({ ...state, holes });
     }
     case 'setPin': {
       const holes = state.holes.slice();
@@ -213,7 +283,7 @@ function reducer(state: Session, action: Action): Session {
         ...currentHole(state),
         pin: action.pin ?? undefined,
       };
-      return { ...state, holes };
+      return rescoreCurrentHole({ ...state, holes });
     }
     case 'setHoleLength': {
       const holes = state.holes.slice();
@@ -221,7 +291,7 @@ function reducer(state: Session, action: Action): Session {
         ...currentHole(state),
         lengthM: action.lengthM ?? undefined,
       };
-      return { ...state, holes };
+      return rescoreCurrentHole({ ...state, holes });
     }
     case 'addShot': {
       const hole = currentHole(state);
@@ -276,6 +346,12 @@ export function sectorOf(c: ShotCategory): keyof SectorAverages {
   return 'short'; // short + bunker
 }
 
+export function sectorShotCounts(s: Session): SectorAverages {
+  const acc: SectorAverages = { drive: 0, approach: 0, short: 0, putt: 0 };
+  for (const shot of allShots(s)) acc[sectorOf(shot.category)] += 1;
+  return acc;
+}
+
 export function sectorTotals(s: Session): SectorAverages {
   const acc: SectorAverages = { drive: 0, approach: 0, short: 0, putt: 0 };
   for (const shot of allShots(s)) acc[sectorOf(shot.category)] += shot.strokesGained;
@@ -316,6 +392,7 @@ export function archive(s: Session): ArchivedSession {
     shotsPlayed: allShots(s).length,
     totalStrokesGained: totalSg(s),
     sectors: sectorTotals(s),
+    sectorShots: sectorShotCounts(s),
     perfHc: perfHc(s),
   };
 }
@@ -336,7 +413,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, dispatch] = useReducer(
     reducer,
     null,
-    () => currentStore.load() ?? newSession({ kind: 'hc', hc: 4 }),
+    () =>
+      currentStore.load() ??
+      newSession(loadBenchmarkPref() ?? { kind: 'hc', hc: 4 }),
   );
   const [history, setHistory] = useReducer(
     (_: ArchivedSession[], next: ArchivedSession[]) => next,
@@ -350,12 +429,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     currentStore.save(session);
   }, [session]);
 
-  // Tag the round with the signed-in name; push local history once on login.
+  // Remember the chosen handicap/PRO (local + cloud when signed in).
   useEffect(() => {
-    if (user && displayName) {
-      dispatch({ type: 'setPlayer', player: displayName });
-      void syncAllLocal();
-    }
+    saveBenchmarkPref(session.benchmark);
+  }, [session.benchmark]);
+
+  // Tag the round with the signed-in name, restore the account's saved
+  // benchmark, and push local history once on login.
+  useEffect(() => {
+    if (!user) return;
+    if (displayName) dispatch({ type: 'setPlayer', player: displayName });
+    const saved = loadBenchmarkPref(user.user_metadata?.benchmark);
+    if (saved) dispatch({ type: 'setBenchmark', benchmark: saved });
+    void syncAllLocal();
   }, [user, displayName]);
 
   const value = useMemo<SessionCtx>(() => {

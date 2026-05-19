@@ -110,6 +110,8 @@ export const en: Record<keyof typeof fr, string> = {
 
   sgPerSector: 'AVG SG PER SECTOR',
   hcPerf: 'HC PERFORMANCE',
+  sgTrend: 'STROKES GAINED PER ROUND',
+  sgTrendAxis: 'SG / round',
   sgAxis: 'SG / shot',
   hcAxis: 'Perf. HC',
   sgPerShot: 'Avg SG/shot: {v}',

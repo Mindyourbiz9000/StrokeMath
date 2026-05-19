@@ -89,6 +89,8 @@ export interface ArchivedSession {
   shotsPlayed: number;
   totalStrokesGained: number;
   sectors: SectorAverages;
+  /** Shots played per sector — lets the chart show true SG *per shot*. */
+  sectorShots?: SectorAverages;
   /** Approx. performance handicap implied by this round's scoring. */
   perfHc: number;
 }

@@ -108,6 +108,8 @@ export const fr = {
 
   sgPerSector: 'SG MOYEN PAR SECTEUR',
   hcPerf: 'PERFORMANCE HC',
+  sgTrend: 'STROKES GAINED PAR PARTIE',
+  sgTrendAxis: 'SG / partie',
   sgAxis: 'SG / coup',
   hcAxis: 'HC perf.',
   sgPerShot: 'SG moy./coup : {v}',

@@ -11,11 +11,12 @@ export function EvolutionPage() {
 
   const ordered = history.slice().reverse(); // oldest → newest for the line
 
+  // Honest metric: total Strokes Gained per round over time.
   const hcData = {
     labels: ordered.map((s) => shortDate(s.date)),
     datasets: [
       {
-        data: ordered.map((s) => s.perfHc),
+        data: ordered.map((s) => s.totalStrokesGained),
         borderColor: GREEN,
         backgroundColor: GREEN_DIM,
         fill: true,
@@ -32,7 +33,19 @@ export function EvolutionPage() {
     'short',
     'putt',
   ];
+  // True average SG *per shot*: Σ sector SG ÷ Σ sector shots, across the
+  // rounds that recorded shot counts. Falls back to the per-round mean for
+  // legacy rounds saved before counts were tracked.
+  const withCounts = history.filter((s) => s.sectorShots);
   const sectorAvg = sectors.map((k) => {
+    if (withCounts.length > 0) {
+      const sgSum = withCounts.reduce((a, s) => a + s.sectors[k], 0);
+      const nSum = withCounts.reduce(
+        (a, s) => a + (s.sectorShots?.[k] ?? 0),
+        0,
+      );
+      return nSum > 0 ? +(sgSum / nSum).toFixed(3) : 0;
+    }
     if (history.length === 0) return 0;
     const sum = history.reduce((acc, s) => acc + s.sectors[k], 0);
     return +(sum / history.length).toFixed(3);
@@ -57,7 +70,7 @@ export function EvolutionPage() {
   return (
     <>
       <div className="card">
-        <div className="section-label">📈 {t('hcPerf')}</div>
+        <div className="section-label">📈 {t('sgTrend')}</div>
         {history.length === 0 ? (
           <div className="empty">{t('noSessions')}</div>
         ) : (
@@ -67,10 +80,9 @@ export function EvolutionPage() {
               plugins: { legend: { display: false } },
               scales: {
                 y: {
-                  reverse: true,
                   grid: { color: GRID },
                   ticks: { color: TICK },
-                  title: { display: true, text: t('hcAxis'), color: TICK },
+                  title: { display: true, text: t('sgTrendAxis'), color: TICK },
                 },
                 x: { grid: { color: GRID }, ticks: { color: TICK } },
               },

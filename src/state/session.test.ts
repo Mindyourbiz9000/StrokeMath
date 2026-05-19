@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildShot } from './session';
+import { buildShot, rescoreHole } from './session';
 import { haversine } from '../lib/geo';
 import type { Benchmark, GeoPoint, Hole } from '../types';
 
@@ -58,6 +58,29 @@ describe('buildShot — pin-aware distance', () => {
     );
     // No pin → naive: holeLength − measuredDistance.
     expect(shot.remainingAfter).toBeCloseTo(Math.max(0, 380 - dist), 1);
+  });
+
+  it('rescoreHole fixes earlier shots once the pin is set later', () => {
+    // Drive entered before the flag was captured (no pin → approximation).
+    const before = buildShot(
+      hole(undefined),
+      {
+        category: 'drive',
+        toLie: 'fairway',
+        measuredDistance: haversine(tee, ball),
+        start: tee,
+        end: ball,
+        holeLength: 380,
+      },
+      HC4,
+    );
+    const playedHole: Hole = { ...hole(pin), shots: [before] };
+    const fixed = rescoreHole(playedHole, HC4);
+    const trueLeave = haversine(ball, pin);
+    expect(fixed.shots[0].remainingAfter).toBeGreaterThan(trueLeave - 3);
+    expect(fixed.shots[0].remainingAfter).toBeLessThan(trueLeave + 3);
+    expect(fixed.shots[0].strokesGained).not.toBe(before.strokesGained);
+    expect(fixed.shots[0].id).toBe(before.id); // stable key
   });
 
   it('a holed shot always leaves 0 regardless of pin', () => {
