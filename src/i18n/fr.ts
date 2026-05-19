@@ -6,6 +6,7 @@ export const fr = {
 
   tabPlay: 'JEU',
   tabEvolution: 'ÉVOLUTION',
+  tabFaq: 'FAQ',
 
   gpsReady: 'GPS PRÊT',
   gpsLocating: 'GPS · LOCALISATION…',

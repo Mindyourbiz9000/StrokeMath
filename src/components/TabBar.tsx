@@ -1,6 +1,6 @@
 import { useI18n } from '../i18n';
 
-export type Tab = 'play' | 'evolution';
+export type Tab = 'play' | 'evolution' | 'faq';
 
 export function TabBar({
   tab,
@@ -25,6 +25,13 @@ export function TabBar({
       >
         <span className="ic">📈</span>
         {t('tabEvolution')}
+      </button>
+      <button
+        className={tab === 'faq' ? 'active' : ''}
+        onClick={() => onChange('faq')}
+      >
+        <span className="ic">❓</span>
+        {t('tabFaq')}
       </button>
     </nav>
   );

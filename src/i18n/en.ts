@@ -8,6 +8,7 @@ export const en: Record<keyof typeof fr, string> = {
 
   tabPlay: 'PLAY',
   tabEvolution: 'PROGRESS',
+  tabFaq: 'FAQ',
 
   gpsReady: 'GPS READY',
   gpsLocating: 'GPS · LOCATING…',

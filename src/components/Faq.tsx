@@ -1,49 +1,24 @@
-import { useI18n, type Lang } from '../i18n';
+import { useI18n } from '../i18n';
 
-export function Faq({
-  onBack,
-  onOpenApp,
-}: {
-  onBack: () => void;
-  onOpenApp: () => void;
-}) {
-  const { lang, setLang } = useI18n();
+/** Content-only FAQ rendered inside the in-app tab (no outer nav/header). */
+export function FaqContent() {
+  const { lang } = useI18n();
   const content = lang === 'fr' ? FR : EN;
 
   return (
-    <div className="home faq">
-      <nav className="home-nav">
-        <button className="brand-link" onClick={onBack}>
-          <span className="brand-mark" />
-          <span className="brand">ShotIQ</span>
-        </button>
-        <div className="home-nav-right">
-          <div className="lang-toggle">
-            {(['fr', 'en'] as Lang[]).map((l) => (
-              <button
-                key={l}
-                className={lang === l ? 'on' : ''}
-                onClick={() => setLang(l)}
-              >
-                {l.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        </div>
-      </nav>
-
-      <header className="hero faq-hero">
+    <div className="faq-tab">
+      <header className="faq-tab-hero">
         <div className="eyebrow">{content.kicker}</div>
         <h1>{content.title}</h1>
         <p className="lead">{content.lead}</p>
       </header>
 
-      <section className="home-section">
+      <section className="faq-section">
         <div className="kicker">{content.basicsKicker}</div>
         <div className="faq-block">{content.basics}</div>
       </section>
 
-      <section className="home-section">
+      <section className="faq-section">
         <div className="kicker">{content.formulaKicker}</div>
         <div className="formula-card">
           <div className="formula">
@@ -53,7 +28,7 @@ export function Faq({
         </div>
       </section>
 
-      <section className="home-section">
+      <section className="faq-section">
         <div className="kicker">{content.sectorsKicker}</div>
         <ul className="sector-list">
           {content.sectors.map((s, i) => (
@@ -65,7 +40,7 @@ export function Faq({
         </ul>
       </section>
 
-      <section className="home-section">
+      <section className="faq-section">
         <div className="kicker">{content.qaKicker}</div>
         <div className="qa-list">
           {content.qa.map((item, i) => (
@@ -76,23 +51,6 @@ export function Faq({
           ))}
         </div>
       </section>
-
-      <section className="home-final">
-        <h2>{content.finalCta}</h2>
-        <div className="hero-cta" style={{ flexDirection: 'row' }}>
-          <button className="btn-secondary" onClick={onBack}>
-            ← {content.backHome}
-          </button>
-          <button className="btn-primary" onClick={onOpenApp}>
-            {content.openApp}
-          </button>
-        </div>
-      </section>
-
-      <footer className="home-footer">
-        <span className="brand-mark sm" />
-        ShotIQ · Strokes Gained Tracker · © {new Date().getFullYear()}
-      </footer>
     </div>
   );
 }
@@ -297,10 +255,6 @@ const FR = {
       ),
     },
   ],
-
-  finalCta: 'Prêt à mesurer chaque coup ?',
-  backHome: 'Accueil',
-  openApp: 'OUVRIR L’APPLICATION',
 };
 
 // ── English ───────────────────────────────────────────────────────────────
@@ -499,8 +453,4 @@ const EN: typeof FR = {
       ),
     },
   ],
-
-  finalCta: 'Ready to measure every shot?',
-  backHome: 'Home',
-  openApp: 'OPEN THE APP',
 };

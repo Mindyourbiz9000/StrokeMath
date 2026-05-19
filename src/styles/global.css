@@ -1143,6 +1143,30 @@ table.hist th.r {
   line-height: 1.5;
   margin: 0;
 }
+/* FAQ — in-app tab variant (no outer nav) */
+.faq-tab { padding-top: 4px; }
+.faq-tab-hero { text-align: center; padding: 14px 4px 18px; }
+.faq-tab-hero h1 {
+  font-size: 26px;
+  letter-spacing: -0.03em;
+  line-height: 1.12;
+  margin: 14px 0 10px;
+  background: linear-gradient(180deg, #ffffff, #b9b6e8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.faq-tab-hero .lead {
+  font-size: 14px;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+.faq-section {
+  padding: 22px 0;
+  border-top: 1px solid var(--hairline);
+}
+.faq-section:first-of-type { border-top: none; }
+
 /* FAQ page */
 .faq-hero { padding: 40px 0 30px; }
 .faq-block p {
