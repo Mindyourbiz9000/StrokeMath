@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -471,8 +472,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('online', onOnline);
   }, [userId]);
 
-  const value = useMemo<SessionCtx>(() => {
-    const persistArchive = (s: Session) => {
+  // Persist + cloud-sync a round. Idempotent: the session id is stable and
+  // syncRound full-replaces holes/shots, so calling this repeatedly while a
+  // round is in progress just upserts the latest state.
+  const persistRound = useCallback(
+    (s: Session) => {
       if (allShots(s).length === 0) return;
       const archived = archive(s);
       const next = [
@@ -481,18 +485,29 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       ];
       historyStore.save(next);
       setHistory(next);
-      // Keep the full round (holes + shots) locally for normalized sync.
       const record = { session: s, archived };
       roundsStore.upsert(record);
       if (userId) void syncRound(record, userId);
-    };
+    },
+    [userId],
+  );
 
-    return {
+  // Save/sync the live round shortly after each change, so a round in
+  // progress reaches local history + the cloud WITHOUT waiting for the
+  // player to start a new round.
+  useEffect(() => {
+    if (allShots(session).length === 0) return;
+    const id = window.setTimeout(() => persistRound(session), 1500);
+    return () => window.clearTimeout(id);
+  }, [session, persistRound]);
+
+  const value = useMemo<SessionCtx>(
+    () => ({
       session,
       history,
       dispatch,
       startNewRound: () => {
-        persistArchive(session);
+        persistRound(session); // flush immediately before resetting
         dispatch({ type: 'newRound' });
       },
       clearHistory: () => {
@@ -501,8 +516,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setHistory([]);
         if (userId) void softDeleteRemote(userId);
       },
-    };
-  }, [session, history, userId]);
+    }),
+    [session, history, userId, persistRound],
+  );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
