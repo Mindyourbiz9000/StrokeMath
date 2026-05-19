@@ -1,16 +1,18 @@
--- ShotIQ — Supabase schema
--- Run in the Supabase SQL editor (or `supabase db push`).
+-- ShotIQ — Supabase schema (idempotent: safe to run repeatedly, and it
+-- repairs tables created by earlier versions of this file).
 --
 -- The app is offline-first and playable as a guest with no account at all.
 -- This table is the optional cloud mirror of finished rounds for signed-in
 -- (Google OAuth) users, with per-user row isolation.
 
+-- Fresh installs get the full table; existing tables are upgraded by the
+-- ALTERs below (create-table-if-not-exists does NOT add missing columns).
 create table if not exists public.sessions (
   id                    text primary key,
-  user_id               uuid not null references auth.users (id) on delete cascade,
+  user_id               uuid references auth.users (id) on delete cascade,
   played_at             timestamptz not null default now(),
   player                text not null default 'Player',
-  benchmark             text not null,
+  benchmark             text not null default '{}',
   holes_played          integer not null default 0,
   shots_played          integer not null default 0,
   total_strokes_gained  numeric not null default 0,
@@ -20,15 +22,32 @@ create table if not exists public.sessions (
   created_at            timestamptz not null default now()
 );
 
--- Migration for projects created before two-way sync (idempotent):
+-- ── Repair migration for older tables (each step is a no-op if present) ─────
+alter table public.sessions
+  add column if not exists user_id uuid references auth.users (id) on delete cascade;
+alter table public.sessions
+  add column if not exists played_at timestamptz not null default now();
+alter table public.sessions
+  add column if not exists player text not null default 'Player';
+alter table public.sessions
+  add column if not exists benchmark text not null default '{}';
+alter table public.sessions
+  add column if not exists holes_played integer not null default 0;
+alter table public.sessions
+  add column if not exists shots_played integer not null default 0;
+alter table public.sessions
+  add column if not exists total_strokes_gained numeric not null default 0;
+alter table public.sessions
+  add column if not exists sectors jsonb not null default '{}'::jsonb;
+alter table public.sessions
+  add column if not exists perf_hc numeric not null default 0;
 alter table public.sessions
   add column if not exists deleted boolean not null default false;
+alter table public.sessions
+  add column if not exists created_at timestamptz not null default now();
 
 create index if not exists sessions_user_active_idx
   on public.sessions (user_id, deleted, played_at desc);
-
-create index if not exists sessions_user_played_idx
-  on public.sessions (user_id, played_at desc);
 
 -- Row Level Security: each user can only see and write their own rounds.
 alter table public.sessions enable row level security;
