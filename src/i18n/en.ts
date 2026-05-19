@@ -187,6 +187,10 @@ export const en: Record<keyof typeof fr, string> = {
   homeStep3Title: '3 · Read your Strokes Gained',
   homeStep3Body:
     'Benchmark against any handicap or PRO level, sector by sector, and track your progress.',
+  homeSeeIt: 'THE APP IN ACTION',
+  homeShot1: 'GPS shot capture · live distance + Strokes Gained',
+  homeShot2: 'Session summary by sector vs your handicap',
+  homeShot3: 'Progress tracking over time',
   homeFeatures: 'WHY SHOTIQ',
   homeF1: '📍 Accurate multi-sample GPS',
   homeF1b: 'Reliable measurement even standing still on course.',

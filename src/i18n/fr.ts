@@ -186,6 +186,10 @@ export const fr = {
   homeStep3Title: '3 · Lisez vos Strokes Gained',
   homeStep3Body:
     'Comparez-vous à un handicap ou au niveau PRO, secteur par secteur, et suivez votre progression.',
+  homeSeeIt: 'L’APPLICATION EN ACTION',
+  homeShot1: 'Capture GPS · distance + Strokes Gained en direct',
+  homeShot2: 'Bilan de session par secteur, vs votre handicap',
+  homeShot3: 'Suivi de progression sur la durée',
   homeFeatures: 'POURQUOI SHOTIQ',
   homeF1: '📍 GPS précis multi-échantillons',
   homeF1b: 'Mesure fiable même immobile sur le parcours.',

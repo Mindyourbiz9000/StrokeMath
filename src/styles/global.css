@@ -1080,6 +1080,47 @@ table.hist th.r {
   line-height: 1.58;
   margin: 0;
 }
+
+/* Marketing screenshots gallery — horizontal scroll-snap on every viewport */
+.screens {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 4px 12px;
+  margin: 0 -20px;
+  scroll-padding: 20px;
+}
+.screens::-webkit-scrollbar { display: none; }
+.screen {
+  flex: 0 0 auto;
+  width: 260px;
+  margin: 0;
+  scroll-snap-align: center;
+  text-align: center;
+}
+.screen img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 30px;
+  border: 1px solid var(--hairline);
+  box-shadow: 0 26px 50px -22px rgba(124, 122, 255, 0.4),
+    0 10px 30px -10px rgba(0, 0, 0, 0.6);
+}
+.screen figcaption {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.screens::before,
+.screens::after {
+  content: '';
+  flex: 0 0 4px;
+}
+
 .feature-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

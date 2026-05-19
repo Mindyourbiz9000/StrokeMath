@@ -80,6 +80,22 @@ export function Home({ onEnter }: { onEnter: () => void }) {
       </section>
 
       <section className="home-section">
+        <div className="kicker">{t('homeSeeIt')}</div>
+        <div className="screens">
+          {[
+            { src: '/screens/screen1.png', cap: t('homeShot1') },
+            { src: '/screens/screen2.png', cap: t('homeShot2') },
+            { src: '/screens/screen3.png', cap: t('homeShot3') },
+          ].map((s) => (
+            <figure className="screen" key={s.src}>
+              <img src={s.src} alt={s.cap} loading="lazy" />
+              <figcaption>{s.cap}</figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
+
+      <section className="home-section">
         <div className="kicker">{t('homeFeatures')}</div>
         <div className="feature-grid">
           {features.map((f, i) => (
