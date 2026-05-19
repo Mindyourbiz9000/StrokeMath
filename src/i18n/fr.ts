@@ -61,6 +61,8 @@ export const fr = {
   par5: 'Par 5',
   holeLength: 'Longueur du trou (m)',
   holeLengthHint: 'Optionnel — améliore le calcul du départ',
+  editHoleLength: 'Modifier',
+  useDefault: 'Par défaut',
 
   landingTerrain: '📍 TERRAIN D’ARRIVÉE — OÙ EST VOTRE BALLE ?',
   lieFairway: 'Fairway',

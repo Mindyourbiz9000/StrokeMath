@@ -525,6 +525,24 @@ table.hist td.r,
   color: var(--neg);
   background: var(--danger-soft);
 }
+.length-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.inline-link {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+.inline-link:active {
+  background: var(--accent-tint);
+}
 .topin-live {
   text-align: center;
   font-size: 15px;

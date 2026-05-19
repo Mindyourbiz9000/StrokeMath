@@ -63,6 +63,8 @@ export const en: Record<keyof typeof fr, string> = {
   par5: 'Par 5',
   holeLength: 'Hole length (m)',
   holeLengthHint: 'Optional — improves the tee-shot calculation',
+  editHoleLength: 'Customize',
+  useDefault: 'Use default',
 
   landingTerrain: '📍 LANDING — WHERE IS YOUR BALL?',
   lieFairway: 'Fairway',
