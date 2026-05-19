@@ -146,6 +146,14 @@ export const fr = {
   useGps: '📡 Utiliser le GPS',
   shotSaved: 'Coup enregistré ✓',
 
+  gpsStepAim: 'À LA BALLE',
+  gpsAimHint:
+    'Placez-vous à votre balle, puis lancez le repère GPS de départ.',
+  gpsStepHit: 'JOUEZ, PUIS MARCHEZ',
+  gpsHitHint:
+    'Jouez votre coup et marchez jusqu’à la balle. Appuyez sur STOP en arrivant à la balle : la distance est calculée.',
+  redoStart: 'Refaire le départ',
+
   homeHeroTitle: 'Le golf, mesuré au coup près.',
   homeHeroSub:
     'ShotIQ enregistre chaque coup au GPS, calcule vos Strokes Gained et vous montre exactement où gagner des points — du départ au putting.',

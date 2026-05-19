@@ -445,6 +445,49 @@ table.hist td.r,
   padding: 14px 12px;
   border-radius: 16px;
 }
+.btn.green-fill.tap {
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Guided-step affordances */
+.step-line {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  margin-bottom: 8px;
+}
+.step-pill {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent-tint);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 750;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 22px;
+}
+.step-done {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(46, 230, 214, 0.12);
+  border: 1px solid rgba(46, 230, 214, 0.3);
+  color: var(--pos);
+  border-radius: 14px;
+  padding: 13px;
+  font-size: 13px;
+  font-weight: 620;
+}
 
 /* ── Big readout ─────────────────────────────────────────── */
 .readout {

@@ -146,6 +146,42 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
   const canCommitGps =
     !!toLie && (manualMode ? manual !== '' : measured != null);
 
+  const resetGpsStart = () => {
+    setStartPt(null);
+    setStartAcc(null);
+    setMeasured(null);
+    setMeasuredAcc(null);
+  };
+
+  // The shot happens in the real world in this order, so the UI follows it:
+  // aim (at the ball) → hit (walk to it) → result (distance known, pick lie).
+  const gpsPhase: 'aim' | 'hit' | 'result' =
+    measured != null ? 'result' : startPt ? 'hit' : 'aim';
+  const accTone =
+    measuredAcc == null
+      ? ''
+      : measuredAcc <= 8
+        ? 'pos'
+        : measuredAcc <= 16
+          ? 'gold'
+          : 'neg';
+
+  const lieChips = (
+    <div className="chips">
+      {LANDING.map((l) => (
+        <button
+          key={l.lie}
+          className={`chip ${l.danger ? 'danger' : ''} ${
+            toLie === l.lie ? 'sel' : ''
+          }`}
+          onClick={() => setToLie(l.lie)}
+        >
+          {t(l.t as 'lieFairway')}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
     <>
       {/* Par + hole length */}
@@ -187,27 +223,12 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
         </div>
       </div>
 
-      {/* Landing terrain + GPS capture */}
+      {/* GPS shot — guided in real-world order: aim → hit → result */}
       {isGps && (
         <div className="card">
-          <div className="section-label">{t('landingTerrain')}</div>
-          <div className="chips">
-            {LANDING.map((l) => (
-              <button
-                key={l.lie}
-                className={`chip ${l.danger ? 'danger' : ''} ${
-                  toLie === l.lie ? 'sel' : ''
-                }`}
-                onClick={() => setToLie(l.lie)}
-              >
-                {t(l.t as 'lieFairway')}
-              </button>
-            ))}
-          </div>
-
           <div
             className="section-label"
-            style={{ marginTop: 16, justifyContent: 'space-between' }}
+            style={{ justifyContent: 'space-between' }}
           >
             <span>📡 {t('gpsCapture')}</span>
             <button
@@ -223,84 +244,118 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
             </button>
           </div>
 
-          {!manualMode && (
+          {manualMode ? (
             <>
+              <label className="field" style={{ display: 'block' }}>
+                <span className="muted" style={{ fontSize: 11 }}>
+                  {t('meters')}
+                </span>
+                <input
+                  inputMode="decimal"
+                  value={manual}
+                  onChange={(e) =>
+                    setManual(e.target.value.replace(/[^0-9.]/g, ''))
+                  }
+                  placeholder="0"
+                />
+              </label>
+              <div className="section-label" style={{ marginTop: 18 }}>
+                {t('landingTerrain')}
+              </div>
+              {lieChips}
+              <PenaltyStepper value={penalty} onChange={setPenalty} />
               <button
-                className="btn green-fill"
+                className="btn green-fill tap"
+                style={{ marginTop: 16 }}
+                disabled={!canCommitGps}
+                onClick={commitGps}
+              >
+                {t('validateShot')}
+              </button>
+            </>
+          ) : gpsPhase === 'aim' ? (
+            <>
+              <div className="step-line">
+                <span className="step-pill">1</span> {t('gpsStepAim')}
+              </div>
+              <p className="hint" style={{ marginTop: 0, marginBottom: 14 }}>
+                {t('gpsAimHint')}
+              </p>
+              <button
+                className="btn green-fill tap"
                 onClick={onStart}
                 disabled={busy != null}
-                style={{ marginTop: 8 }}
               >
                 ▶ {busy === 'start' ? t('capturing') : t('start')}
-                <span className="btn-sub">
-                  {startPt
-                    ? t('startRecorded', { m: startAcc ?? '?' })
-                    : t('startSub')}
-                </span>
+                <span className="btn-sub">{t('startSub')}</span>
               </button>
+            </>
+          ) : gpsPhase === 'hit' ? (
+            <>
+              <div className="step-done">
+                ✓ {t('startRecorded', { m: startAcc ?? '?' })}
+              </div>
+              <div className="step-line" style={{ marginTop: 14 }}>
+                <span className="step-pill">2</span> {t('gpsStepHit')}
+              </div>
+              <p className="hint" style={{ marginTop: 0, marginBottom: 14 }}>
+                {t('gpsHitHint')}
+              </p>
               <button
-                className="btn red-outline"
+                className="btn green-fill tap"
                 onClick={onStop}
-                disabled={!startPt || busy != null}
-                style={{ marginTop: 10 }}
+                disabled={busy != null}
               >
                 ■ {busy === 'stop' ? t('capturing') : t('stop')}
                 <span className="btn-sub">{t('stopSub')}</span>
               </button>
-
-              {measured != null && (
-                <div style={{ marginTop: 14, textAlign: 'center' }}>
-                  <div className="bignum">{measured.toFixed(2)} M</div>
-                  {measuredAcc != null && (
-                    <div
-                      className={`muted ${
-                        measuredAcc <= 8 ? 'pos' : measuredAcc <= 16 ? 'gold' : 'neg'
-                      }`}
-                      style={{ fontSize: 12 }}
-                    >
-                      {t('distUncertainty', { m: measuredAcc })}
-                    </div>
-                  )}
-                  <button
-                    className="btn ghost"
-                    style={{ marginTop: 10 }}
-                    onClick={onStop}
-                    disabled={busy != null}
-                  >
-                    {t('remeasure')}
-                  </button>
+              <button
+                className="btn ghost"
+                style={{ marginTop: 10 }}
+                onClick={resetGpsStart}
+                disabled={busy != null}
+              >
+                ↺ {t('redoStart')}
+              </button>
+            </>
+          ) : (
+            <>
+              <div style={{ textAlign: 'center', marginTop: 2 }}>
+                <div className="bignum">
+                  {measured!.toFixed(2)}{' '}
+                  <span style={{ fontSize: 22 }}>m</span>
                 </div>
-              )}
+                {measuredAcc != null && (
+                  <div className={`muted ${accTone}`} style={{ fontSize: 12 }}>
+                    {t('distUncertainty', { m: measuredAcc })}
+                  </div>
+                )}
+                <button
+                  className="btn ghost"
+                  style={{ marginTop: 10, maxWidth: 200, marginInline: 'auto' }}
+                  onClick={onStop}
+                  disabled={busy != null}
+                >
+                  {t('remeasure')}
+                </button>
+              </div>
+
+              <div className="step-line" style={{ marginTop: 18 }}>
+                <span className="step-pill">3</span> {t('landingTerrain')}
+              </div>
+              {lieChips}
+
+              <PenaltyStepper value={penalty} onChange={setPenalty} />
+              <button
+                className="btn green-fill tap"
+                style={{ marginTop: 16 }}
+                disabled={!canCommitGps}
+                onClick={commitGps}
+              >
+                {t('validateShot')}
+              </button>
             </>
           )}
-
-          {manualMode && (
-            <label className="field" style={{ marginTop: 10, display: 'block' }}>
-              <span className="muted" style={{ fontSize: 11 }}>
-                {t('meters')}
-              </span>
-              <input
-                inputMode="decimal"
-                value={manual}
-                onChange={(e) =>
-                  setManual(e.target.value.replace(/[^0-9.]/g, ''))
-                }
-                placeholder="0"
-              />
-            </label>
-          )}
-
-          <PenaltyStepper value={penalty} onChange={setPenalty} />
-          <p className="hint">{t('stopHint')}</p>
-
-          <button
-            className="btn"
-            style={{ marginTop: 10 }}
-            disabled={!canCommitGps}
-            onClick={commitGps}
-          >
-            {t('validateShot')}
-          </button>
         </div>
       )}
 

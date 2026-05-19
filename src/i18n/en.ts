@@ -148,6 +148,13 @@ export const en: Record<keyof typeof fr, string> = {
   useGps: '📡 Use GPS',
   shotSaved: 'Shot saved ✓',
 
+  gpsStepAim: 'AT THE BALL',
+  gpsAimHint: 'Stand at your ball, then drop the GPS start marker.',
+  gpsStepHit: 'HIT, THEN WALK',
+  gpsHitHint:
+    'Play your shot and walk to the ball. Press STOP when you reach the ball — the distance is calculated.',
+  redoStart: 'Redo start',
+
   homeHeroTitle: 'Golf, measured shot by shot.',
   homeHeroSub:
     'ShotIQ records every shot by GPS, computes your Strokes Gained, and shows exactly where to gain points — from the tee to the putting green.',
