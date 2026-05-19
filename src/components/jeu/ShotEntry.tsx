@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '../../i18n';
-import { useSession, holeState } from '../../state/session';
+import { useSession } from '../../state/session';
 import { useToast } from '../Toast';
 import { haversine, combinedAccuracy, type GpsController } from '../../lib/geo';
 import { defaultHoleLength } from '../../lib/strokesGained';
 import { PuttEntry } from './PuttEntry';
-import type { GeoPoint, Lie, Par, ShotCategory } from '../../types';
+import { HoleSetup } from './HoleSetup';
+import type { GeoPoint, Lie, ShotCategory } from '../../types';
 
 const CATEGORIES: { id: ShotCategory; t: string; s: string }[] = [
   { id: 'drive', t: 'catDrive', s: 'catDriveSub' },
@@ -36,6 +37,7 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
 
   // GPS capture
   const [startPt, setStartPt] = useState<GeoPoint | null>(null);
+  const [endPt, setEndPt] = useState<GeoPoint | null>(null);
   const [startAcc, setStartAcc] = useState<number | null>(null);
   const [measured, setMeasured] = useState<number | null>(null);
   const [measuredAcc, setMeasuredAcc] = useState<number | null>(null);
@@ -52,6 +54,7 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
   useEffect(() => {
     setToLie(null);
     setStartPt(null);
+    setEndPt(null);
     setStartAcc(null);
     setMeasured(null);
     setMeasuredAcc(null);
@@ -68,6 +71,7 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
   const resetAll = () => {
     setToLie(null);
     setStartPt(null);
+    setEndPt(null);
     setStartAcc(null);
     setMeasured(null);
     setMeasuredAcc(null);
@@ -83,6 +87,7 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
       const r = await gps.capture();
       setStartPt(r.point);
       setStartAcc(r.accuracy);
+      setEndPt(null);
       setMeasured(null);
       setMeasuredAcc(null);
     } catch {
@@ -101,6 +106,7 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
     setBusy('stop');
     try {
       const r = await gps.capture();
+      setEndPt(r.point);
       setMeasured(+haversine(startPt, r.point).toFixed(2));
       setMeasuredAcc(combinedAccuracy(startAcc ?? undefined, r.accuracy));
     } catch {
@@ -120,7 +126,15 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
     if (dist == null || !toLie) return;
     dispatch({
       type: 'addShot',
-      input: { category, toLie, measuredDistance: dist, penalty, holeLength },
+      input: {
+        category,
+        toLie,
+        measuredDistance: dist,
+        penalty,
+        holeLength,
+        start: manualMode ? undefined : startPt ?? undefined,
+        end: manualMode ? undefined : endPt ?? undefined,
+      },
     });
     toast(t('shotSaved'));
     resetAll();
@@ -142,12 +156,12 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
     resetAll();
   };
 
-  const { count } = holeState(hole, holeLength);
   const canCommitGps =
     !!toLie && (manualMode ? manual !== '' : measured != null);
 
   const resetGpsStart = () => {
     setStartPt(null);
+    setEndPt(null);
     setStartAcc(null);
     setMeasured(null);
     setMeasuredAcc(null);
@@ -184,25 +198,7 @@ export function ShotEntry({ gps }: { gps: GpsController }) {
 
   return (
     <>
-      {/* Par + hole length */}
-      <div className="card">
-        <div className="section-label">⛳ {t('par')}</div>
-        <div className="chips">
-          {([3, 4, 5] as Par[]).map((p) => (
-            <button
-              key={p}
-              className={`chip ${hole.par === p ? 'sel' : ''}`}
-              disabled={count > 0}
-              onClick={() => dispatch({ type: 'setPar', par: p })}
-            >
-              {t(`par${p}` as 'par3' | 'par4' | 'par5')}
-            </button>
-          ))}
-          <span className="muted" style={{ alignSelf: 'center', fontSize: 11 }}>
-            ≈ {holeLength} m
-          </span>
-        </div>
-      </div>
+      <HoleSetup gps={gps} />
 
       {/* Category */}
       <div className="card">

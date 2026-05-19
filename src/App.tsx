@@ -4,6 +4,8 @@ import { TabBar, type Tab } from './components/TabBar';
 import { JeuPage } from './components/jeu/JeuPage';
 import { EvolutionPage } from './components/evolution/EvolutionPage';
 import { Home } from './components/Home';
+import { GpsProvider } from './lib/gpsContext';
+import { useWakeLock } from './lib/geo';
 
 type View = 'home' | 'app';
 const ENTERED_KEY = 'shotiq.entered';
@@ -18,21 +20,26 @@ export function App() {
     if (view === 'app') localStorage.setItem(ENTERED_KEY, '1');
   }, [view]);
 
+  // Keep the screen awake for the whole round, not per tab/component.
+  useWakeLock(view === 'app');
+
   if (view === 'home') {
     return <Home onEnter={() => setView('app')} />;
   }
 
   return (
-    <div className="app">
-      <Header onHome={() => setView('home')} />
-      <div className="scroll" key={tab}>
-        {tab === 'play' ? (
-          <JeuPage onConsult={() => setTab('evolution')} />
-        ) : (
-          <EvolutionPage />
-        )}
+    <GpsProvider>
+      <div className="app">
+        <Header onHome={() => setView('home')} />
+        <div className="scroll" key={tab}>
+          {tab === 'play' ? (
+            <JeuPage onConsult={() => setTab('evolution')} />
+          ) : (
+            <EvolutionPage />
+          )}
+        </div>
+        <TabBar tab={tab} onChange={setTab} />
       </div>
-      <TabBar tab={tab} onChange={setTab} />
-    </div>
+    </GpsProvider>
   );
 }

@@ -153,6 +153,12 @@ export const fr = {
   gpsHitHint:
     'Jouez votre coup et marchez jusqu’à la balle. Appuyez sur STOP en arrivant à la balle : la distance est calculée.',
   redoStart: 'Refaire le départ',
+  pinCapture: '📍 Capturer le drapeau (GPS)',
+  pinCapturing: 'Capture du drapeau…',
+  pinSet: '📍 Drapeau capturé · ±{m} m',
+  pinClear: 'Effacer',
+  pinHint:
+    'Optionnel : capturez le drapeau (au green) pour une distance au trou exacte. Sinon, saisissez la longueur du trou.',
 
   homeHeroTitle: 'Le golf, mesuré au coup près.',
   homeHeroSub:

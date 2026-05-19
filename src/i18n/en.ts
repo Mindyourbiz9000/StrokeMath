@@ -154,6 +154,12 @@ export const en: Record<keyof typeof fr, string> = {
   gpsHitHint:
     'Play your shot and walk to the ball. Press STOP when you reach the ball — the distance is calculated.',
   redoStart: 'Redo start',
+  pinCapture: '📍 Capture the flag (GPS)',
+  pinCapturing: 'Capturing the flag…',
+  pinSet: '📍 Flag captured · ±{m} m',
+  pinClear: 'Clear',
+  pinHint:
+    'Optional: capture the flag (at the green) for exact distance-to-pin. Otherwise enter the hole length.',
 
   homeHeroTitle: 'Golf, measured shot by shot.',
   homeHeroSub:

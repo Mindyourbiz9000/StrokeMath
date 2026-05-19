@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useGps, useWakeLock } from '../../lib/geo';
+import { useGpsCtx } from '../../lib/gpsContext';
 import { TopBar } from './TopBar';
 import { SessionSummary } from './SessionSummary';
 import { BenchmarkSelector } from './BenchmarkSelector';
@@ -8,9 +8,7 @@ import { ShotEntry } from './ShotEntry';
 import { ShotHistory } from './ShotHistory';
 
 export function JeuPage({ onConsult }: { onConsult: () => void }) {
-  const gps = useGps();
-  // Keep the screen awake while playing so a round isn't interrupted.
-  useWakeLock(true);
+  const gps = useGpsCtx();
 
   // Warm the GPS watch as soon as permission is already granted.
   useEffect(() => {

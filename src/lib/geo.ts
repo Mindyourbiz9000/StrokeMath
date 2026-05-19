@@ -187,6 +187,14 @@ export function useGps() {
         buffer.current = [];
         const startedAt = Date.now();
 
+        // Force a fresh, uncached high-accuracy fix in parallel with the warm
+        // watch so STOP reflects where you stand now, not a 2 s-old position.
+        navigator.geolocation.getCurrentPosition(
+          handleSample,
+          () => {},
+          { enableHighAccuracy: true, maximumAge: 0, timeout: maxWaitMs },
+        );
+
         const finish = () => {
           const all = buffer.current.slice();
           if (all.length === 0) {
@@ -233,7 +241,7 @@ export function useGps() {
         const timer = window.setInterval(tick, 350);
       });
     },
-    [supported, startWatch],
+    [supported, startWatch, handleSample],
   );
 
   return {

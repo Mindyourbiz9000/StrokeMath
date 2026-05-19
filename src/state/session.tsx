@@ -9,6 +9,7 @@ import {
 import type {
   ArchivedSession,
   Benchmark,
+  GeoPoint,
   Hole,
   Lie,
   Par,
@@ -18,6 +19,7 @@ import type {
   ShotCategory,
 } from '../types';
 import { uid } from '../lib/format';
+import { haversine } from '../lib/geo';
 import { strokesGained } from '../lib/strokesGained';
 import {
   currentStore,
@@ -87,6 +89,10 @@ export interface AddShotInput {
   distanceAfter?: number;
   penalty?: number;
   holeLength: number;
+  /** GPS position the shot was played from (drive / approach). */
+  start?: GeoPoint;
+  /** GPS position the ball came to rest at (drive / approach). */
+  end?: GeoPoint;
 }
 
 type Action =
@@ -94,6 +100,8 @@ type Action =
   | { type: 'setBenchmark'; benchmark: Benchmark }
   | { type: 'setPlayer'; player: string }
   | { type: 'setPar'; par: Par }
+  | { type: 'setPin'; pin: GeoPoint | null }
+  | { type: 'setHoleLength'; lengthM: number | null }
   | { type: 'addShot'; input: AddShotInput }
   | { type: 'undoShot' }
   | { type: 'completeHole' }
@@ -104,7 +112,11 @@ function currentHole(s: Session): Hole {
   return s.holes[s.holes.length - 1];
 }
 
-function buildShot(hole: Hole, input: AddShotInput, benchmark: Benchmark): Shot {
+export function buildShot(
+  hole: Hole,
+  input: AddShotInput,
+  benchmark: Benchmark,
+): Shot {
   const { lie: trackedLie, remaining } = holeState(hole, input.holeLength);
   const number = hole.shots.length + 1;
 
@@ -115,6 +127,15 @@ function buildShot(hole: Hole, input: AddShotInput, benchmark: Benchmark): Shot 
   else if (input.category === 'bunker') fromLie = 'sand';
   else if (number === 1) fromLie = 'fairway';
   else fromLie = trackedLie;
+
+  // Exact distance-to-pin when the flag has been GPS-captured for this hole.
+  const pin = hole.pin;
+  const toPin = (p?: GeoPoint) =>
+    pin && p ? haversine(p, pin) : undefined;
+
+  // Tee baseline: prefer GPS (tee→pin), then a manual hole length.
+  const holeLength =
+    toPin(input.start) ?? hole.lengthM ?? input.holeLength;
 
   let distance: number;
   let distanceBefore: number;
@@ -132,9 +153,14 @@ function buildShot(hole: Hole, input: AddShotInput, benchmark: Benchmark): Shot 
   } else {
     // drive / approach via GPS
     distance = input.measuredDistance ?? 0;
-    distanceBefore = remaining;
+    // distanceBefore is the start→pin distance when the pin is known;
+    // otherwise fall back to the tracked remaining (or hole length off the tee).
+    distanceBefore =
+      toPin(input.start) ?? (fromLie === 'tee' ? holeLength : remaining);
     remainingAfter =
-      input.toLie === 'holed' ? 0 : Math.max(0, remaining - distance);
+      input.toLie === 'holed'
+        ? 0
+        : (toPin(input.end) ?? Math.max(0, distanceBefore - distance));
   }
 
   const penalty = input.penalty ?? 0;
@@ -145,7 +171,7 @@ function buildShot(hole: Hole, input: AddShotInput, benchmark: Benchmark): Shot 
     toLie: input.toLie,
     distanceAfter: remainingAfter,
     penalty,
-    holeLength: input.holeLength,
+    holeLength,
   });
 
   return {
@@ -158,6 +184,8 @@ function buildShot(hole: Hole, input: AddShotInput, benchmark: Benchmark): Shot 
     remainingAfter,
     strokesGained: sgValue,
     penalty,
+    start: input.start,
+    end: input.end,
   };
 }
 
@@ -176,6 +204,22 @@ function reducer(state: Session, action: Action): Session {
       holes[holes.length - 1] = {
         ...currentHole(state),
         par: action.par,
+      };
+      return { ...state, holes };
+    }
+    case 'setPin': {
+      const holes = state.holes.slice();
+      holes[holes.length - 1] = {
+        ...currentHole(state),
+        pin: action.pin ?? undefined,
+      };
+      return { ...state, holes };
+    }
+    case 'setHoleLength': {
+      const holes = state.holes.slice();
+      holes[holes.length - 1] = {
+        ...currentHole(state),
+        lengthM: action.lengthM ?? undefined,
       };
       return { ...state, holes };
     }

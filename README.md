@@ -66,6 +66,10 @@ difficulty-aware factor. The numbers are tunable — this is the app's own model
 not an official statistic — and line up with the POC's reference values
 (137 m fairway ≈ 2.98, 1 m putt ≈ 1.04, 6 m putt ≈ 1.76 around HC 3).
 
+Distance-to-pin is exact when the flag is GPS-captured for the hole (or a hole
+length is entered): drive/approach shots store their start/end GPS points and
+score against the pin. Without a pin it falls back to shot-length progression.
+
 Short-game/bunker shots assume a representative finishing proximity by landing
 lie (documented in `src/state/session.ts`) since the POC captures only the
 shot's start distance and where it stopped.

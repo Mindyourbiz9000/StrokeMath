@@ -46,6 +46,10 @@ export interface Hole {
   par: Par;
   shots: Shot[];
   completed: boolean;
+  /** GPS position of the flag, if captured — enables exact distance-to-pin. */
+  pin?: GeoPoint;
+  /** Manual hole length (m); overrides the par-based default for the tee. */
+  lengthM?: number;
 }
 
 export interface Session {
