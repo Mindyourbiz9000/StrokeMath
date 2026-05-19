@@ -9,7 +9,10 @@ import { supabase } from './supabase';
 
 const CURRENT_KEY = 'strokemath.current';
 const HISTORY_KEY = 'strokemath.history';
+const ROUNDS_KEY = 'strokemath.rounds';
+const UNSYNCED_KEY = 'strokemath.unsynced';
 const HISTORY_LIMIT = 50;
+const ROUNDS_LIMIT = 30;
 
 // Bump when the persisted shape changes incompatibly. Stored data is wrapped
 // in an envelope; a mismatched or invalid payload is discarded rather than
@@ -35,7 +38,6 @@ function load<T>(key: string, validate: (x: unknown) => x is T): T | null {
   if (!parsed || typeof parsed !== 'object') return null;
   const env = parsed as Partial<Envelope<unknown>>;
   if (env.v !== SCHEMA_VERSION) {
-    // Unknown / older shape — drop it so we never hydrate bad state.
     try {
       localStorage.removeItem(key);
     } catch {
@@ -129,6 +131,17 @@ function isArchived(x: unknown): x is ArchivedSession {
 const isArchivedArray = (x: unknown): x is ArchivedSession[] =>
   Array.isArray(x) && x.every(isArchived);
 
+/** A finished round kept locally at full fidelity for sync + retry. */
+export interface RoundRecord {
+  session: Session;
+  archived: ArchivedSession;
+}
+
+const isRoundRecord = (x: unknown): x is RoundRecord =>
+  isObj(x) && isSession(x.session) && isArchived(x.archived);
+const isRoundArray = (x: unknown): x is RoundRecord[] =>
+  Array.isArray(x) && x.every(isRoundRecord);
+
 export const currentStore = {
   load: (): Session | null => load(CURRENT_KEY, isSession),
   save: (s: Session | null) => save(CURRENT_KEY, s),
@@ -140,6 +153,19 @@ export const historyStore = {
   clear: () => save(HISTORY_KEY, []),
 };
 
+/** Full finished rounds (holes + shots) — source for normalized cloud sync. */
+export const roundsStore = {
+  load: (): RoundRecord[] => load(ROUNDS_KEY, isRoundArray) ?? [],
+  upsert: (rec: RoundRecord) => {
+    const next = [
+      rec,
+      ...roundsStore.load().filter((r) => r.archived.id !== rec.archived.id),
+    ];
+    save(ROUNDS_KEY, next.slice(0, ROUNDS_LIMIT));
+  },
+  clear: () => save(ROUNDS_KEY, []),
+};
+
 /** Serialise everything in local storage (used by the crash-recovery export). */
 export function exportBackup(): string {
   return JSON.stringify(
@@ -147,22 +173,20 @@ export function exportBackup(): string {
       exportedAt: new Date().toISOString(),
       current: readRaw(CURRENT_KEY),
       history: readRaw(HISTORY_KEY),
+      rounds: readRaw(ROUNDS_KEY),
     },
     null,
     2,
   );
 }
 
-/**
- * Best-effort upsert of a finished session to Supabase. Only runs when a
- * user is signed in (guests stay local-only). Never throws — a failed sync
- * just leaves the round in local history to retry later.
- */
-const UNSYNCED_KEY = 'strokemath.unsynced';
+// ── Cloud sync (normalized: sessions + holes + shots) ───────────────────────
 
 function unsynced(): string[] {
   const x = readRaw(UNSYNCED_KEY);
-  return Array.isArray(x) ? (x.filter((i) => typeof i === 'string') as string[]) : [];
+  return Array.isArray(x)
+    ? (x.filter((i) => typeof i === 'string') as string[])
+    : [];
 }
 function setUnsynced(ids: string[]): void {
   try {
@@ -172,36 +196,100 @@ function setUnsynced(ids: string[]): void {
   }
 }
 
-export async function syncSession(
-  s: ArchivedSession,
+function holeRows(session: Session, userId: string) {
+  return session.holes.map((h) => ({
+    id: h.id,
+    session_id: session.id,
+    user_id: userId,
+    number: h.number,
+    par: h.par,
+    length_m: h.lengthM ?? null,
+    pin_lat: h.pin?.lat ?? null,
+    pin_lng: h.pin?.lng ?? null,
+  }));
+}
+
+function shotRows(session: Session, userId: string) {
+  return session.holes.flatMap((h) =>
+    h.shots.map((s) => ({
+      id: s.id,
+      hole_id: h.id,
+      session_id: session.id,
+      user_id: userId,
+      number: s.number,
+      category: s.category,
+      from_lie: s.fromLie,
+      to_lie: s.toLie,
+      distance_m: s.distance,
+      remaining_m: s.remainingAfter,
+      penalty: s.penalty,
+      strokes_gained: s.strokesGained,
+      start_lat: s.start?.lat ?? null,
+      start_lng: s.start?.lng ?? null,
+      end_lat: s.end?.lat ?? null,
+      end_lng: s.end?.lng ?? null,
+    })),
+  );
+}
+
+/**
+ * Sync one finished round: upsert the aggregate `sessions` row, then replace
+ * its `holes`/`shots` (delete + insert) so edits/deletions are reflected.
+ * Idempotent and safe to retry. Failures enqueue the round id.
+ */
+export async function syncRound(
+  rec: RoundRecord,
   userId: string,
 ): Promise<boolean> {
   if (!supabase || !userId) return false;
+  const a = rec.archived;
+  const sid = a.id;
   try {
-    const { error } = await supabase.from('sessions').upsert(
+    const sessionUpsert = await supabase.from('sessions').upsert(
       {
-        id: s.id,
+        id: sid,
         user_id: userId,
-        played_at: s.date,
-        player: s.player,
-        benchmark: JSON.stringify(s.benchmark),
-        holes_played: s.holesPlayed,
-        shots_played: s.shotsPlayed,
-        total_strokes_gained: s.totalStrokesGained,
-        sectors: s.sectors,
-        perf_hc: s.perfHc,
+        played_at: a.date,
+        player: a.player,
+        benchmark: JSON.stringify(a.benchmark),
+        holes_played: a.holesPlayed,
+        shots_played: a.shotsPlayed,
+        total_strokes_gained: a.totalStrokesGained,
+        sectors: a.sectors,
+        perf_hc: a.perfHc,
         deleted: false,
       },
       { onConflict: 'id' },
     );
-    if (error) {
-      setUnsynced([...unsynced(), s.id]);
-      return false;
+    if (sessionUpsert.error) throw sessionUpsert.error;
+
+    // Full replace of detail (handles shot deletion / renumber).
+    const delShots = await supabase
+      .from('shots')
+      .delete()
+      .eq('session_id', sid);
+    if (delShots.error) throw delShots.error;
+    const delHoles = await supabase
+      .from('holes')
+      .delete()
+      .eq('session_id', sid);
+    if (delHoles.error) throw delHoles.error;
+
+    const holes = holeRows(rec.session, userId);
+    if (holes.length) {
+      const insH = await supabase.from('holes').insert(holes);
+      if (insH.error) throw insH.error;
     }
-    setUnsynced(unsynced().filter((id) => id !== s.id));
+    const shots = shotRows(rec.session, userId);
+    if (shots.length) {
+      const insS = await supabase.from('shots').insert(shots);
+      if (insS.error) throw insS.error;
+    }
+
+    setUnsynced(unsynced().filter((id) => id !== sid));
     return true;
   } catch {
-    setUnsynced([...unsynced(), s.id]);
+    setUnsynced([...unsynced(), sid]);
     return false;
   }
 }
@@ -236,7 +324,7 @@ function rowToArchived(r: RemoteRow): ArchivedSession | null {
   }
 }
 
-/** Pull the user's cloud rounds and merge with local (union by id). */
+/** Pull the user's cloud rounds (aggregates) and merge with local by id. */
 export async function pullAndMerge(userId: string): Promise<ArchivedSession[]> {
   const local = historyStore.load();
   if (!supabase || !userId) return local;
@@ -252,9 +340,9 @@ export async function pullAndMerge(userId: string): Promise<ArchivedSession[]> {
     const byId = new Map<string, ArchivedSession>();
     for (const s of local) byId.set(s.id, s);
     for (const row of data as RemoteRow[]) {
-      const a = rowToArchived(row);
+      const arch = rowToArchived(row);
       // Local wins on conflict (it may carry sectorShots the cloud lacks).
-      if (a && !byId.has(a.id)) byId.set(a.id, a);
+      if (arch && !byId.has(arch.id)) byId.set(arch.id, arch);
     }
     const merged = [...byId.values()].sort(
       (x, y) => +new Date(y.date) - +new Date(x.date),
@@ -270,15 +358,15 @@ export async function pullAndMerge(userId: string): Promise<ArchivedSession[]> {
 export async function pushUnsynced(userId: string): Promise<void> {
   if (!supabase || !userId) return;
   const queued = new Set(unsynced());
-  for (const s of historyStore.load()) {
-    if (!queued.size || queued.has(s.id)) {
+  for (const rec of roundsStore.load()) {
+    if (!queued.size || queued.has(rec.archived.id)) {
       // eslint-disable-next-line no-await-in-loop
-      await syncSession(s, userId);
+      await syncRound(rec, userId);
     }
   }
 }
 
-/** Login reconciliation: pull remote, merge, then push local-only. */
+/** Login reconciliation: pull remote, merge, then push local detail. */
 export async function reconcile(userId: string): Promise<ArchivedSession[]> {
   const merged = await pullAndMerge(userId);
   await pushUnsynced(userId);

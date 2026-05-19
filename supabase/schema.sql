@@ -67,6 +67,63 @@ create policy "own sessions write"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+-- ── Normalized per-shot detail (holes + shots) ─────────────────────────────
+-- The sessions row stays as a fast aggregate cache for the Évolution
+-- list/charts; these tables hold the raw data for SQL stats / future
+-- server-side re-scoring. user_id is denormalized onto every row so RLS
+-- stays a single cheap predicate. Stable client ids → idempotent upserts.
+
+create table if not exists public.holes (
+  id          text primary key,
+  session_id  text not null references public.sessions (id) on delete cascade,
+  user_id     uuid references auth.users (id) on delete cascade,
+  number      integer not null,
+  par         integer not null,
+  length_m    numeric,
+  pin_lat     double precision,
+  pin_lng     double precision,
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists public.shots (
+  id              text primary key,
+  hole_id         text not null references public.holes (id) on delete cascade,
+  session_id      text not null references public.sessions (id) on delete cascade,
+  user_id         uuid references auth.users (id) on delete cascade,
+  number          integer not null,
+  category        text not null,
+  from_lie        text not null,
+  to_lie          text not null,
+  distance_m      numeric not null default 0,
+  remaining_m     numeric not null default 0,
+  penalty         integer not null default 0,
+  strokes_gained  numeric not null default 0,
+  start_lat       double precision,
+  start_lng       double precision,
+  end_lat         double precision,
+  end_lng         double precision,
+  created_at      timestamptz not null default now()
+);
+
+create index if not exists holes_session_idx on public.holes (session_id);
+create index if not exists shots_session_idx on public.shots (session_id);
+create index if not exists shots_hole_idx    on public.shots (hole_id);
+create index if not exists shots_user_cat_idx on public.shots (user_id, category);
+
+alter table public.holes enable row level security;
+alter table public.shots enable row level security;
+
+drop policy if exists "own holes" on public.holes;
+drop policy if exists "own shots" on public.shots;
+
+create policy "own holes" on public.holes
+  for all to authenticated
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "own shots" on public.shots
+  for all to authenticated
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
 -- ─────────────────────────────────────────────────────────────────────────
 -- Saved handicap / PRO preference: NO migration required. It is stored in
 -- the signed-in user's auth metadata via supabase.auth.updateUser({ data:

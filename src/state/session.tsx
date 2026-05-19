@@ -25,7 +25,8 @@ import { loadBenchmarkPref, saveBenchmarkPref } from '../lib/prefs';
 import {
   currentStore,
   historyStore,
-  syncSession,
+  roundsStore,
+  syncRound,
   reconcile,
   pushUnsynced,
   softDeleteRemote,
@@ -480,7 +481,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       ];
       historyStore.save(next);
       setHistory(next);
-      if (userId) void syncSession(archived, userId);
+      // Keep the full round (holes + shots) locally for normalized sync.
+      const record = { session: s, archived };
+      roundsStore.upsert(record);
+      if (userId) void syncRound(record, userId);
     };
 
     return {
@@ -493,6 +497,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       },
       clearHistory: () => {
         historyStore.clear();
+        roundsStore.clear();
         setHistory([]);
         if (userId) void softDeleteRemote(userId);
       },
