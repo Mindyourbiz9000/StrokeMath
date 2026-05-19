@@ -124,6 +124,93 @@ create policy "own shots" on public.shots
   for all to authenticated
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+-- ── Ready-made analytics views ─────────────────────────────────────────────
+-- security_invoker = on → the caller's RLS applies, so each user only ever
+-- sees their own shots. Soft-deleted rounds are excluded via the join.
+-- Re-run safely (create or replace).
+
+create or replace view public.v_active_shots
+  with (security_invoker = on) as
+select sh.*, ss.played_at, ss.benchmark
+from public.shots sh
+join public.sessions ss on ss.id = sh.session_id
+where ss.deleted = false;
+
+-- Strokes Gained by category (tee / approach / short / bunker / putt).
+create or replace view public.v_sg_by_category
+  with (security_invoker = on) as
+select
+  user_id,
+  category,
+  count(*)                              as shots,
+  round(avg(strokes_gained), 3)         as sg_per_shot,
+  round(sum(strokes_gained), 2)         as sg_total
+from public.v_active_shots
+group by user_id, category;
+
+-- Strokes Gained by the lie the shot was played from.
+create or replace view public.v_sg_by_lie
+  with (security_invoker = on) as
+select
+  user_id,
+  from_lie,
+  count(*)                              as shots,
+  round(avg(strokes_gained), 3)         as sg_per_shot
+from public.v_active_shots
+group by user_id, from_lie;
+
+-- Putting: make rate + SG by 1 m distance bucket.
+create or replace view public.v_putting_by_distance
+  with (security_invoker = on) as
+select
+  user_id,
+  greatest(1, ceil(distance_m))::int    as bucket_m,
+  count(*)                              as putts,
+  round(avg((to_lie = 'holed')::int), 3) as make_rate,
+  round(avg(strokes_gained), 3)         as sg_per_putt
+from public.v_active_shots
+where category = 'putt'
+group by user_id, greatest(1, ceil(distance_m))::int;
+
+-- Approaches: SG + green-hit rate by 10 m distance bucket.
+create or replace view public.v_approach_by_distance
+  with (security_invoker = on) as
+select
+  user_id,
+  (floor(distance_m / 10) * 10)::int    as bucket_start_m,
+  count(*)                              as shots,
+  round(avg((to_lie = 'green')::int), 3) as green_rate,
+  round(avg(strokes_gained), 3)         as sg_per_shot
+from public.v_active_shots
+where category = 'approach'
+group by user_id, (floor(distance_m / 10) * 10)::int;
+
+-- Per-round SG by sector (recomputed from raw shots; sanity-checks the
+-- denormalized sessions cache).
+create or replace view public.v_round_sectors
+  with (security_invoker = on) as
+select
+  user_id,
+  session_id,
+  max(played_at)                        as played_at,
+  round(sum(strokes_gained) filter (where category = 'drive'), 2)    as sg_tee,
+  round(sum(strokes_gained) filter (where category = 'approach'), 2) as sg_approach,
+  round(sum(strokes_gained) filter (where category in ('short','bunker')), 2) as sg_short,
+  round(sum(strokes_gained) filter (where category = 'putt'), 2)     as sg_putt,
+  round(sum(strokes_gained), 2)         as sg_total,
+  count(*)                              as shots
+from public.v_active_shots
+group by user_id, session_id;
+
+grant select on
+  public.v_active_shots,
+  public.v_sg_by_category,
+  public.v_sg_by_lie,
+  public.v_putting_by_distance,
+  public.v_approach_by_distance,
+  public.v_round_sectors
+to authenticated;
+
 -- ─────────────────────────────────────────────────────────────────────────
 -- Saved handicap / PRO preference: NO migration required. It is stored in
 -- the signed-in user's auth metadata via supabase.auth.updateUser({ data:
